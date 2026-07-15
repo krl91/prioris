@@ -1,0 +1,97 @@
+name: Build release runtimes
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  LLAMA_CPP_REF: b10012
+
+jobs:
+  macos-arm64:
+    name: macOS arm64 runtime
+    runs-on: macos-14
+    steps:
+      - name: Checkout llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_CPP_REF }}
+          path: llama.cpp
+
+      - name: Configure
+        run: >
+          cmake -S llama.cpp -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_NATIVE=OFF
+          -DLLAMA_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 3
+
+      - name: Package
+        run: |
+          mkdir -p runtime/macos-arm64
+          cp llama.cpp/LICENSE runtime/macos-arm64/
+          find build -type f \( -perm -111 -o -name "*.dylib" \) -exec cp {} runtime/macos-arm64/ \;
+          (cd runtime && zip -r ../runtime-macos-arm64.zip macos-arm64)
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-macos-arm64
+          path: runtime-macos-arm64.zip
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: runtime-macos-arm64.zip
+
+  windows-x64:
+    name: Windows x64 runtime
+    runs-on: windows-2022
+    steps:
+      - name: Checkout llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_CPP_REF }}
+          path: llama.cpp
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake -S llama.cpp -B build
+          -A x64
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_NATIVE=OFF
+          -DLLAMA_BUILD_TESTS=OFF
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --parallel 3
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force runtime/windows-x64 | Out-Null
+          Get-ChildItem build -Recurse -File -Include *.exe,*.dll |
+            Copy-Item -Destination runtime/windows-x64 -Force
+          Compress-Archive -Path runtime/windows-x64 -DestinationPath runtime-windows-x64.zip -Force
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-windows-x64
+          path: runtime-windows-x64.zip
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: runtime-windows-x64.zip

@@ -1,0 +1,222 @@
+{
+  "main": {
+    "id": "a220ad00a097d7ba",
+    "type": "split",
+    "children": [
+      {
+        "id": "4b5e235423311d1d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9902243e5b98c1a9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Quotidien/2026-07-10.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2026-07-10"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "87d5fe17c913dbdc",
+    "type": "split",
+    "children": [
+      {
+        "id": "35c1395f5d82e672",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5d93270b23a58ba5",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorateur de fichiers"
+            }
+          },
+          {
+            "id": "3b653332150c7223",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Rechercher"
+            }
+          },
+          {
+            "id": "ec79d80ee9b88a69",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Signets"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "f13b6c30945192ee",
+    "type": "split",
+    "children": [
+      {
+        "id": "40e6612df823ed9f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c19b550b5e22aa40",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Quotidien/2026-07-10.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Rétrolien pour 2026-07-10"
+            }
+          },
+          {
+            "id": "ae70a8a99f7dc142",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Quotidien/2026-07-10.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Liens sortants de 2026-07-10"
+            }
+          },
+          {
+            "id": "1330fc6ab22d6b1b",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Mots-clés"
+            }
+          },
+          {
+            "id": "c433c4bed6a0bcb8",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Toutes les propriétés"
+            }
+          },
+          {
+            "id": "c0676f188177bd2c",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Quotidien/2026-07-10.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Plan de 2026-07-10"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Ouvrir le sélecteur rapide": false,
+      "graph:Ouvrir la vue graphique": false,
+      "canvas:Créer une nouvelle toile": false,
+      "daily-notes:Ouvrir la note quotidienne": false,
+      "templates:Insérer le modèle": false,
+      "command-palette:Ouvrir la palette de commandes": false,
+      "bases:Créer une nouvelle base": false,
+      "copilot:Open Copilot Chat": false,
+      "obsidian-kanban:Create new board": false
+    }
+  },
+  "active": "9902243e5b98c1a9",
+  "lastOpenFiles": [
+    "PRIORIS/details/18 - Finaliser et valider le modèle de donnée.md",
+    "PRIORIS/details/17 - Organiser un point avec MDMS et les cdp.md",
+    "PRIORIS/details/16 - Demander des nouvelles à Tom oralement à.md",
+    "PRIORIS/details/15 - Choisir 1 formation certifiante CPF à aj.md",
+    "PRIORIS/details/14 - Relancer manager RATP + anciens contacts.md",
+    "PRIORIS/details/13 - Préparer 3 pitchs clairs  chef de projet.md",
+    "PRIORIS/details/12 - Rédiger fiche profil PDF (missions, comp.md",
+    "PRIORIS/details/11 - Envoyer un mail de synthèse professionna.md",
+    "PRIORIS/details/10 - 🛡️ Plan de protection Intercontrat – ITL.md",
+    "PRIORIS/details/8 - 🟢 Conditions minimales si acceptation de.md",
+    "PRIORIS/details/7 - ❓ Questions clés (killers) avant tout en.md",
+    "PRIORIS/details/6 - ✉️ Refus de mission – Version profession.md",
+    "PRIORIS/details/5 - Remplacement.md",
+    "PRIORIS/Plan du jour.md",
+    "Quotidien/2026-07-12.md",
+    "PRIORIS/details/9 - 🚆 Recherche de missions alternatives – S.md",
+    "PRIORIS/details",
+    "PRIORIS",
+    "Quotidien/2026-07-10.md",
+    "Synthèse/__Tout sujets__.md",
+    "_templates_/Note quotidienne.md",
+    "Synthèse/Kallipr.md",
+    "Synthèse/Export mdms.md",
+    "Test.md",
+    "Synthèse/Sans titre.md",
+    "Synthèse/Zero Flow.md",
+    "Synthèse/Actions Kanban.md",
+    "copilot/copilot-custom-prompts/Clip Web Page.md",
+    "copilot/copilot-custom-prompts",
+    "copilot",
+    "Synthèse"
+  ]
+}

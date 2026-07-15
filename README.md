@@ -56,6 +56,16 @@ pip install --no-index --find-links wheelhouse -e ".[dev]"
 PRIORIS ne télécharge aucun modèle au démarrage. Pour `local_gguf`, la release
 doit déjà embarquer le binaire d'inférence CLI/stdout et le fichier `.gguf`.
 
+Téléchargement manuel des modèles GGUF recommandés :
+
+- 3B Q4_K_M, recommandé par défaut :
+  https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+- 8B Q4_K_M, plus lourd :
+  https://huggingface.co/unsloth/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf
+
+Place le fichier choisi dans `models/`, puis renseigne `model` dans
+`config.toml`.
+
 Chemins Windows dans `config.toml` : privilégier les `/`, par exemple
 `vault_path = "C:/Users/Example/Documents/Vault"`. Les chemins Windows avec `\`
 sont acceptés si tu utilises des quotes simples TOML :

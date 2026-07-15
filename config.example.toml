@@ -1,0 +1,103 @@
+# PRIORIS — configuration. Copier vers config.toml et compléter.
+#
+# ── Mode d'interface ────────────────────────────────────────────────────────
+# • token renseigné → bot Telegram (usage mobile, notifications push)
+# • token vide ou section absente → interface graphique locale (tkinter,
+#   inclus dans Python — aucune installation supplémentaire).
+#
+# Limites du mode local vs Telegram :
+#   - accès local uniquement (même machine, même session)
+#   - pas d'interface mobile
+#   - pas de notifications push
+#   - le LLM reste optionnel ; si enabled=true, la GUI active aussi
+#     diagnostic, préchauffage et interprétation de réponses libres.
+# ────────────────────────────────────────────────────────────────────────────
+
+[telegram]
+token = ""                           # laisser vide pour le mode local (GUI)
+# token = "123456:ABC-DEF..."        # décommenter + renseigner pour Telegram
+
+[database]
+path = "prioris.db"
+
+[ui]
+# Français par défaut. Mettre "en" pour les questions/options d'entretien en anglais.
+# Les calculs restent identiques ; seules les formulations UI changent.
+language = "fr"
+
+[obsidian]
+# Chemin absolu du vault. Laisser vide pour désactiver l'export.
+# Windows recommandé : vault_path = "C:/Users/Example/Documents/Vault"
+# Windows accepté aussi : vault_path = 'C:\Users\Example\Documents\Vault'
+vault_path = "/chemin/vers/mon/vault"
+
+[llm]
+# Choisir un seul mode :
+#
+# 1. Sans LLM, boutons seuls :
+#    enabled = false
+#
+# 2. LLM local autonome, sans Ollama ni LM Studio, sans port local :
+#    enabled = true
+#    provider = "local_gguf"
+#    runner_path = "auto"
+#    model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+#
+# 3. LLM local via app externe :
+#    provider = "ollama"   + model = "ministral-3:3b"
+#    provider = "lmstudio" + model = "nom affiche dans LM Studio"
+#
+# 4. LLM externe :
+#    provider = "openai"    + api_key_env = "OPENAI_API_KEY"
+#    provider = "anthropic" + api_key_env = "ANTHROPIC_API_KEY"
+#    provider = "copilot"   + api_key_env = "PRIORIS_COPILOT_TOKEN"
+#    provider = "custom"    + base_url + api_key_env si besoin
+#
+# Défaut autoporté conservateur : provider "prioris" (interpréteur intégré,
+# pas un vrai LLM génératif). Mets enabled=false pour n'avoir que les boutons.
+enabled = true
+
+# Choisir UN provider :
+#   "prioris"  → interpréteur local intégré, autoporté (défaut recommandé)
+#   "local_gguf" → modèle GGUF local via binaire embarqué sans serveur/port
+#   "ollama"   → http://localhost:11434/v1   (option avancée externe)
+#   "lmstudio" → http://localhost:1234/v1    (model = nom affiché dans LM Studio)
+#   "openai"   → https://api.openai.com/v1   (api_key requis ; model = "gpt-4o-mini", …)
+#   "anthropic" → https://api.anthropic.com/v1 (api_key requis ; model = "claude-...")
+#   "copilot"  → https://api.githubcopilot.com (expérimental ; abonnement + token Copilot requis)
+#   "custom"   → renseigner base_url vers tout endpoint OpenAI-compatible
+provider = "prioris"
+model = "rules-v1"
+
+# Exemple mode 2, à activer seulement si la release contient un runtime sans serveur :
+# provider = "local_gguf"
+# runner_path = "auto"  # préfère runtime/macos-arm64/llama-simple quand présent
+# model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+# max_tokens = 512
+#
+# Exemple mode 3 Ollama :
+# provider = "ollama"
+# model = "ministral-3:3b"
+#
+# Exemple mode 3 LM Studio :
+# provider = "lmstudio"
+# model = "ministral-3-3b-instruct"
+#
+# Exemple mode 4 OpenAI :
+# provider = "openai"
+# model = "gpt-4o-mini"
+# api_key_env = "OPENAI_API_KEY"
+#
+# Exemple mode 4 Claude :
+# provider = "anthropic"
+# model = "claude-3-5-haiku-latest"
+# api_key_env = "ANTHROPIC_API_KEY"
+
+api_key = ""          # requis pour openai / endpoints protégés
+api_key_env = ""      # recommandé pour les secrets, ex. "PRIORIS_LLM_TOKEN"
+base_url = ""         # uniquement pour custom, ou pour surcharger le preset
+# timeout_s = 120     # optionnel (défaut : 120 s local, 15 s cloud)
+
+# Préchauffage : utile pour les providers externes ; quasi instantané avec prioris.
+keep_warm = true
+keep_warm_interval_min = 4

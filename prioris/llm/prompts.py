@@ -1,0 +1,151 @@
+"""LLM prompts (§5). The LLM never computes priority: it extracts and rephrases."""
+from __future__ import annotations
+
+import datetime as dt
+import json
+
+from ..core.axes import AXIS_LABELS, AXIS_MAX, Axis
+
+INTERVIEWER_SYSTEM = """Tu es l'intervieweur d'un assistant de priorisation de tâches.
+Ton unique rôle : transformer la réponse libre de l'utilisateur en une valeur
+sur l'échelle fournie.
+
+Règles absolues :
+- Tu ne calcules JAMAIS de priorité, de score ou de classement.
+- Tu ne poses pas de question, tu ne commentes pas, tu ne meubles pas.
+- Tu réponds UNIQUEMENT avec un objet JSON, sans texte autour.
+
+Format de sortie STRICT :
+{"valeur": <entier de l'échelle>, "incertitude": <0, 1 ou 2>,
+ "reformulation": "<une phrase reformulant ce que tu as compris>"}
+
+Incertitude : 0 = réponse nette ; 1 = hésitation ("je pense", "sans doute",
+"ça dépend", "peut-être") ; 2 = "je ne sais pas" ou réponse hors sujet.
+La reformulation est en français, à la deuxième personne, factuelle."""
+
+
+GOAL_MATCH_SYSTEM = """Tu relies une tâche à un objectif de vie de l'utilisateur.
+Tu ne décides rien : tu SUGGÈRES, l'utilisateur confirmera par bouton.
+Réponds UNIQUEMENT en JSON strict :
+{"goal_id": <id d'un objectif de la liste, ou null si aucun ne correspond clairement>}
+Sois conservateur : dans le doute, null."""
+
+GOAL_AUDIT_SYSTEM = """Tu vérifies la cohérence entre un objectif de vie et les
+tâches qui lui sont rattachées. Signale UNIQUEMENT les tâches qui ne semblent
+PAS contribuer à cet objectif. Sois conservateur : dans le doute, ne signale pas.
+Réponds UNIQUEMENT en JSON strict :
+{"douteuses": [{"id": <id de tâche>, "raison": "<une phrase courte>"}]}"""
+
+TASK_REVISION_SYSTEM = """Tu aides à intégrer une nouvelle information sur une
+tâche déjà évaluée.
+
+Règles absolues :
+- Tu ne calcules JAMAIS de priorité, de score ou de classement.
+- Tu proposes seulement des changements factuels d'axes si l'information
+  nouvelle les justifie clairement.
+- Sois conservateur : dans le doute, ne change rien.
+- Tu réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"changes": [{"axis": "<code axe>", "value": <entier>, "reason": "<raison courte>"}],
+ "explanation": "<ce que tu veux faire, en une ou deux phrases>"}
+
+Axes autorisés :
+BLK = qui est bloqué ; CDR = coût du retard ; HOR = horizon temporel ;
+IMP = impact positif ; INA = coût de l'inaction ; IRR = irréversibilité ;
+ALN = alignement avec objectif."""
+
+TASK_IMPACT_SYSTEM = """Tu analyses une information libre et tu identifies les
+tâches existantes qu'elle peut impacter.
+
+Règles absolues :
+- Tu ne modifies rien.
+- Tu ne calcules jamais de priorité ni de score.
+- Tu proposes seulement une liste d'id de tâches existantes si le lien est clair.
+- Si aucune tâche existante ne correspond, mets `"impacted": []` ; ne mets
+  jamais `null` comme id.
+- Pour chaque tâche proposée, explique l'impact identifié en une phrase.
+- Si l'information est formulée comme une question, ajoute une phrase qui répond
+  directement à la question à partir des tâches connues et de l'information
+  fournie. Si tu ne sais pas répondre, dis-le clairement.
+- Si aucune tâche ne semble clairement impactée, propose un titre de nouvelle
+  tâche à créer.
+- Si l'information contient une date ou une échéance claire, propose-la dans
+  `suggested_deadline` au format ISO `AAAA-MM-JJ`. Utilise `date_du_jour` pour
+  convertir les formulations relatives comme "aujourd'hui", "ce soir",
+  "demain" ou "d'ici une heure". Sinon chaîne vide.
+- Réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"impacted": [{"id": <id tâche>, "impact": "<impact identifié>"}],
+ "new_task_title": "<titre si aucune tâche impactée, sinon chaîne vide>",
+ "suggested_deadline": "<date ISO AAAA-MM-JJ si détectée, sinon chaîne vide>",
+ "direct_answer": "<réponse directe courte si l'utilisateur a posé une question, sinon chaîne vide>",
+ "explanation": "<résumé court>"}"""
+
+QUADRANT_QUESTIONS_SYSTEM = """Tu aides l'utilisateur à situer une tâche dans
+la matrice urgent/important.
+
+Règles absolues :
+- Tu ne calcules jamais la priorité.
+- Tu ne donnes jamais de quadrant final.
+- Tu poses exactement 3 questions courtes, concrètes et adaptées à la tâche.
+- Les questions doivent aider à distinguer urgent/non urgent et important/non
+  important.
+- Réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
+
+
+def build_goal_match_payload(task_title: str,
+                             goals: list[tuple[int, str]]) -> str:
+    return json.dumps({"tache": task_title,
+                       "objectifs": [{"id": i, "titre": t} for i, t in goals]},
+                      ensure_ascii=False)
+
+
+def build_goal_audit_payload(goal_title: str,
+                             tasks: list[tuple[int, str]]) -> str:
+    return json.dumps({"objectif": goal_title,
+                       "taches": [{"id": i, "titre": t} for i, t in tasks]},
+                      ensure_ascii=False)
+
+
+def build_interpret_payload(axis: Axis, question: str, user_text: str) -> str:
+    echelle = {str(i): label for i, label in enumerate(AXIS_LABELS[axis])}
+    return json.dumps({
+        "axe": axis.value,
+        "question_posee": question,
+        "echelle": echelle,
+        "valeur_max": AXIS_MAX[axis],
+        "reponse_utilisateur": user_text,
+    }, ensure_ascii=False)
+
+
+def build_task_revision_payload(context: dict, note: str) -> str:
+    return json.dumps({
+        "tache": context["task"],
+        "evaluation_actuelle": context["evaluation"],
+        "information_nouvelle": note,
+    }, ensure_ascii=False)
+
+
+def build_task_impact_payload(tasks: list[tuple[int, str]], note: str) -> str:
+    return json.dumps({
+        "date_du_jour": dt.date.today().isoformat(),
+        "information": note,
+        "taches_existantes": [{"id": i, "titre": t} for i, t in tasks],
+    }, ensure_ascii=False)
+
+
+def build_quadrant_questions_payload(task_title: str, language: str) -> str:
+    return json.dumps({
+        "tache": task_title,
+        "langue": "anglais" if language == "en" else "français",
+        "objectif": (
+            "Formule les 3 questions en anglais."
+            if language == "en" else
+            "Formule les 3 questions en français."
+        ),
+    }, ensure_ascii=False)

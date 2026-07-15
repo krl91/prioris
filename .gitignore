@@ -1,0 +1,32 @@
+# Local configuration and secrets
+config.toml
+*.env
+.env
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+logs/
+
+# Local Obsidian vaults / user data
+ObsidianVault/
+Mon Second Cerveau*/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pylint.d/
+
+# macOS / editor noise
+.DS_Store
+
+# Large offline/runtime artifacts. Publish these via releases or Git LFS.
+models/
+runtime/
+artifacts/
+vendor/
+wheelhouse/

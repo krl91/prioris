@@ -12,6 +12,49 @@ env:
   LLAMA_CPP_REF: b10012
 
 jobs:
+  linux-x64:
+    name: Linux x64 runtime
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout llama.cpp
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_CPP_REF }}
+          path: llama.cpp
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build build-essential
+
+      - name: Configure
+        run: >
+          cmake -S llama.cpp -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_NATIVE=OFF
+          -DLLAMA_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 3
+
+      - name: Package
+        run: |
+          mkdir -p runtime/linux-x64
+          cp llama.cpp/LICENSE runtime/linux-x64/
+          find build -type f \( -perm -111 -o -name "*.so" -o -name "*.so.*" \) -exec cp {} runtime/linux-x64/ \;
+          tar -czf runtime-linux-x64.tar.gz -C runtime linux-x64
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-linux-x64
+          path: runtime-linux-x64.tar.gz
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: runtime-linux-x64.tar.gz
+
   macos-arm64:
     name: macOS arm64 runtime
     runs-on: macos-14

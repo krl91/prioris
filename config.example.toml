@@ -69,9 +69,10 @@ enabled = true
 provider = "prioris"
 model = "rules-v1"
 
-# Exemple mode 2, à activer seulement si la release contient un runtime sans serveur :
+# Exemple mode 2, à activer seulement si la release contient le runtime
+# autonome llama-simple sans serveur, RPC ni port local :
 # provider = "local_gguf"
-# runner_path = "auto"  # préfère runtime/macos-arm64/llama-simple quand présent
+# runner_path = "auto"  # sélectionne uniquement runtime/<plateforme>/llama-simple
 # model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
 # max_tokens = 512
 #

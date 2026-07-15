@@ -54,7 +54,10 @@ pip install --no-index --find-links wheelhouse -e ".[dev]"
 ```
 
 PRIORIS downloads no model at startup. For `local_gguf`, the release must already
-include the CLI/stdout inference binary and the `.gguf` model file.
+include the CLI/stdout inference binary and the `.gguf` model file. The
+standalone runtime is intentionally limited to `llama-simple` and its
+dependencies: no `llama-server`, no `ggml-rpc-server`, no `llama-cli`, and no
+local port opened.
 
 Manual downloads for the recommended GGUF models:
 

@@ -69,11 +69,10 @@ def test_local_gguf_auto_resout_un_runtime(monkeypatch):
     assert timeout == 120.0
 
 
-def test_local_gguf_auto_prefere_llama_simple_si_present(monkeypatch):
+def test_local_gguf_auto_utilise_llama_simple_macos(monkeypatch):
     import prioris.llm.client as client_mod
     monkeypatch.setattr(client_mod.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(client_mod.platform, "machine", lambda: "arm64")
-    monkeypatch.setattr(client_mod.os.path, "exists", lambda p: p.endswith("llama-simple"))
     runner, model = client_mod._local_gguf_paths(
         LLMConfig(provider="local_gguf", runner_path="auto", model="m.gguf")
     )
@@ -81,15 +80,25 @@ def test_local_gguf_auto_prefere_llama_simple_si_present(monkeypatch):
     assert model == "m.gguf"
 
 
-def test_local_gguf_auto_prefere_llama_simple_windows(monkeypatch):
+def test_local_gguf_auto_utilise_llama_simple_windows(monkeypatch):
     import prioris.llm.client as client_mod
     monkeypatch.setattr(client_mod.platform, "system", lambda: "Windows")
     monkeypatch.setattr(client_mod.platform, "machine", lambda: "AMD64")
-    monkeypatch.setattr(client_mod.os.path, "exists", lambda p: p.endswith("llama-simple.exe"))
     runner, model = client_mod._local_gguf_paths(
         LLMConfig(provider="local_gguf", runner_path="auto", model="m.gguf")
     )
     assert runner == "runtime/windows-x64/llama-simple.exe"
+    assert model == "m.gguf"
+
+
+def test_local_gguf_auto_utilise_llama_simple_linux(monkeypatch):
+    import prioris.llm.client as client_mod
+    monkeypatch.setattr(client_mod.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(client_mod.platform, "machine", lambda: "x86_64")
+    runner, model = client_mod._local_gguf_paths(
+        LLMConfig(provider="local_gguf", runner_path="auto", model="m.gguf")
+    )
+    assert runner == "runtime/linux-x64/llama-simple"
     assert model == "m.gguf"
 
 

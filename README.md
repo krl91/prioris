@@ -55,6 +55,9 @@ pip install --no-index --find-links wheelhouse -e ".[dev]"
 
 PRIORIS ne télécharge aucun modèle au démarrage. Pour `local_gguf`, la release
 doit déjà embarquer le binaire d'inférence CLI/stdout et le fichier `.gguf`.
+Le runtime autonome est volontairement limité à `llama-simple` et à ses
+dépendances : pas de `llama-server`, pas de `ggml-rpc-server`, pas de
+`llama-cli`, et aucun port local ouvert.
 
 Téléchargement manuel des modèles GGUF recommandés :
 

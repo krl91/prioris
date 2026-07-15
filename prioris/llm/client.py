@@ -83,16 +83,17 @@ def _default_gguf_runner() -> str:
     system = platform.system().lower()
     machine = platform.machine().lower()
     if system == "darwin" and machine in ("arm64", "aarch64"):
-        simple = "runtime/macos-arm64/llama-simple"
-        return simple if os.path.exists(simple) else "runtime/macos-arm64/llama-cli"
+        return "runtime/macos-arm64/llama-simple"
     if system == "darwin" and machine in ("x86_64", "amd64"):
-        return "runtime/macos-x64/llama-cli"
+        return "runtime/macos-x64/llama-simple"
     if system == "windows" and machine in ("amd64", "x86_64"):
-        simple = "runtime/windows-x64/llama-simple.exe"
-        return simple if os.path.exists(simple) else "runtime/windows-x64/llama-cli.exe"
+        return "runtime/windows-x64/llama-simple.exe"
     if system == "windows" and machine in ("arm64", "aarch64"):
-        simple = "runtime/windows-arm64/llama-simple.exe"
-        return simple if os.path.exists(simple) else "runtime/windows-arm64/llama-cli.exe"
+        return "runtime/windows-arm64/llama-simple.exe"
+    if system == "linux" and machine in ("x86_64", "amd64"):
+        return "runtime/linux-x64/llama-simple"
+    if system == "linux" and machine in ("arm64", "aarch64"):
+        return "runtime/linux-arm64/llama-simple"
     return ""
 
 

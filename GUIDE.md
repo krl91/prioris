@@ -328,14 +328,20 @@ Fichiers requis dans la release offline :
 - un runtime d'inférence pure sans serveur ni port local, par défaut
   `runtime/macos-arm64/llama-simple` sur macOS Apple Silicon.
 
+Les archives de release sont volontairement limitées au binaire
+`llama-simple` et à ses dépendances. Elles ne doivent pas contenir
+`llama-server`, `ggml-rpc-server`, `llama-cli` ni bibliothèque serveur/RPC.
+
 `runner_path = "auto"` cherche les chemins suivants :
 
-| Système | Runtime préféré | Repli |
-|---|---|---|
-| macOS Apple Silicon | `runtime/macos-arm64/llama-simple` | `llama-cli` est refusé s'il annonce `--server-base` |
-| macOS Intel | `runtime/macos-x64/llama-simple` à fournir | tout runtime serveur-interne est refusé |
-| Windows x64 | `runtime/windows-x64/llama-simple.exe` fourni | `llama-cli.exe` est refusé s'il annonce `--server-base` |
-| Windows arm64 | `runtime/windows-arm64/llama-simple.exe` à fournir | tout runtime serveur-interne est refusé |
+| Système | Runtime autonome |
+|---|---|
+| macOS Apple Silicon | `runtime/macos-arm64/llama-simple` |
+| macOS Intel | `runtime/macos-x64/llama-simple` à fournir |
+| Windows x64 | `runtime/windows-x64/llama-simple.exe` fourni |
+| Windows arm64 | `runtime/windows-arm64/llama-simple.exe` à fournir |
+| Linux x64 | `runtime/linux-x64/llama-simple` |
+| Linux arm64 | `runtime/linux-arm64/llama-simple` à fournir |
 
 Important sécurité : PRIORIS refuse les binaires qui annoncent une couche
 serveur localhost interne. Le mode autonome doit rester un simple process local
@@ -391,9 +397,8 @@ Compatibilité Windows :
   `api-ms-win-crt-*`) sont des DLL système Windows/Universal CRT ;
 - l'utilisateur Windows ne doit rien télécharger pour ce runtime si le dossier
   `runtime/windows-x64/` est livré complet ;
-- l'ancien `runtime/windows-x64/llama-cli.exe` reste présent comme artefact
-  téléchargé, mais il n'est pas recommandé : s'il annonce `--server-base`,
-  PRIORIS le refuse.
+- `llama-cli.exe`, `llama-server.exe` et `ggml-rpc-server.exe` ne sont pas
+  livrés dans le runtime autonome.
 
 Commande utilisée pour installer la toolchain sur macOS :
 

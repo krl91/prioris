@@ -34,13 +34,15 @@ jobs:
           -DLLAMA_BUILD_TESTS=OFF
 
       - name: Build
-        run: cmake --build build --config Release --parallel 3
+        run: cmake --build build --config Release --target llama-simple --parallel 3
 
       - name: Package
         run: |
           mkdir -p runtime/linux-x64
           cp llama.cpp/LICENSE runtime/linux-x64/
-          find build -type f \( -perm -111 -o -name "*.so" -o -name "*.so.*" \) -exec cp {} runtime/linux-x64/ \;
+          cp build/bin/llama-simple runtime/linux-x64/
+          find build/bin -maxdepth 1 -type f \( -name "*.so" -o -name "*.so.*" \) -exec cp {} runtime/linux-x64/ \;
+          ! find runtime/linux-x64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
           tar -czf runtime-linux-x64.tar.gz -C runtime linux-x64
 
       - name: Upload workflow artifact
@@ -74,13 +76,15 @@ jobs:
           -DLLAMA_BUILD_TESTS=OFF
 
       - name: Build
-        run: cmake --build build --config Release --parallel 3
+        run: cmake --build build --config Release --target llama-simple --parallel 3
 
       - name: Package
         run: |
           mkdir -p runtime/macos-arm64
           cp llama.cpp/LICENSE runtime/macos-arm64/
-          find build -type f \( -perm -111 -o -name "*.dylib" \) -exec cp {} runtime/macos-arm64/ \;
+          cp build/bin/llama-simple runtime/macos-arm64/
+          find build/bin -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec cp -P {} runtime/macos-arm64/ \;
+          ! find runtime/macos-arm64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
           (cd runtime && zip -r ../runtime-macos-arm64.zip macos-arm64)
 
       - name: Upload workflow artifact
@@ -117,14 +121,21 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build build --config Release --parallel 3
+        run: cmake --build build --config Release --target llama-simple --parallel 3
 
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force runtime/windows-x64 | Out-Null
-          Get-ChildItem build -Recurse -File -Include *.exe,*.dll |
+          Copy-Item build/bin/Release/llama-simple.exe -Destination runtime/windows-x64 -Force
+          Get-ChildItem build/bin/Release -File -Include *.dll |
             Copy-Item -Destination runtime/windows-x64 -Force
+          $forbidden = Get-ChildItem runtime/windows-x64 -File |
+            Where-Object { $_.Name -match 'server|rpc|llama-cli' }
+          if ($forbidden) {
+            $forbidden | ForEach-Object { Write-Error "Forbidden server/runtime file packaged: $($_.Name)" }
+            exit 1
+          }
           Compress-Archive -Path runtime/windows-x64 -DestinationPath runtime-windows-x64.zip -Force
 
       - name: Upload workflow artifact

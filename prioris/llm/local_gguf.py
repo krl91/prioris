@@ -2,7 +2,7 @@
 
 This provider can run a Ministral-like model without Ollama or LM Studio, as
 long as the release also provides:
-- a local llama.cpp-compatible inference binary (`llama-cli` or equivalent);
+- a local llama.cpp-compatible inference binary (`llama-simple`);
 - a local GGUF model file.
 
 This module downloads nothing and does not use the shell.
@@ -17,7 +17,7 @@ from .client_types import LocalGGUFConfig
 
 
 def _assert_no_embedded_server(runner: Path) -> None:
-    """Refuse llama.cpp launchers that start a localhost server internally."""
+    """Refuse llama.cpp launchers that can start a localhost server internally."""
     try:
         proc = subprocess.run(
             [str(runner), "--help"],
@@ -54,7 +54,7 @@ def _is_llama_simple(runner: Path) -> bool:
 
 
 def _clean_stdout(text: str) -> str:
-    """llama-cli may mix logs, prompt and answer on stdout depending on version."""
+    """llama.cpp binaries may mix logs, prompt and answer on stdout."""
     fenced = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.S)
     if fenced:
         return fenced[-1].strip()

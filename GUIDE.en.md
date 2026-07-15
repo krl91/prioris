@@ -107,6 +107,23 @@ model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
 timeout_s = 120
 ```
 
+`local_gguf` is inference-only. `runner_path = "auto"` selects
+`llama-simple` only:
+
+| System | Standalone runtime |
+|---|---|
+| macOS Apple Silicon | `runtime/macos-arm64/llama-simple` |
+| macOS Intel | `runtime/macos-x64/llama-simple` |
+| Windows x64 | `runtime/windows-x64/llama-simple.exe` |
+| Windows arm64 | `runtime/windows-arm64/llama-simple.exe` |
+| Linux x64 | `runtime/linux-x64/llama-simple` |
+| Linux arm64 | `runtime/linux-arm64/llama-simple` |
+
+Release runtime archives must contain `llama-simple` and its dependencies only.
+They must not contain `llama-server`, `ggml-rpc-server`, `llama-cli`, or
+server/RPC libraries. PRIORIS also refuses binaries whose help text exposes an
+embedded localhost server mode.
+
 External providers such as `openai`, `anthropic`, `custom` and `copilot` are
 supported. Prefer `api_key_env` for secrets.
 

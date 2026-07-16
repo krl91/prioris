@@ -133,7 +133,7 @@ For `local_gguf`, put the GGUF model in `models/`, for example
 Recent releases already include the 3B model in each OS bundle. The 8B model
 remains optional and is downloaded separately.
 
-## Developer Installation
+## Developer Installation from the Source Repository
 
 ```bash
 python3 -m venv .venv
@@ -142,7 +142,16 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result: `191 passed`.
+Expected result in a full source repository clone: `191 passed`.
+
+Ready-to-run release archives do not include the `tests/` folder. If you run
+`pytest` there and get `collected 0 items`, that is normal. To verify a release,
+run instead:
+
+```bash
+python -c "import prioris; print('PRIORIS import ok')"
+python -m prioris.bot.main
+```
 
 Offline installation: provide Python wheels in `wheelhouse/`, then run:
 

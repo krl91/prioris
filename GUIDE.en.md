@@ -208,7 +208,19 @@ runner_path = "auto"
 model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
 ```
 
-7. Verify the installation:
+7. Verify the installation.
+
+In a user release archive, the `tests/` folder is not included: `pytest` may
+therefore print `collected 0 items`. This is not an error. To verify a release,
+run instead:
+
+```bash
+python -c "import prioris; print('PRIORIS import ok')"
+python -m prioris.bot.main
+```
+
+Only in a full source repository clone, where the `tests/` folder is present,
+run:
 
 ```bash
 pytest

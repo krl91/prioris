@@ -1,24 +1,76 @@
 # PRIORIS
 
-Assistant personnel d'aide à la décision : tâches, priorités, plan du jour et
-synchronisation Obsidian. Le coeur reste déterministe : le LLM est optionnel et
-ne décide jamais seul.
+PRIORIS est un assistant personnel pour décider quoi faire maintenant, quoi
+planifier, quoi déléguer et quoi laisser de côté. Il transforme une liste de
+tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian
+synchronisées.
 
-## Fonctionnalités
+Le principe important : le coeur de décision reste déterministe et explicable.
+Un LLM peut aider à comprendre une phrase, poser de meilleures questions ou
+proposer une modification, mais il ne modifie rien sans confirmation.
 
-- Entretien express/complet à boutons, avec contradictions C1-C6.
-- Scoring déterministe P1-P4, `/why`, biais 1-4/7/9 et justification complète.
-- Plan du jour avec énergie, capacité, estimations et dates de réalisation.
-- Mode Telegram ou GUI locale tkinter sans serveur.
-- `/info` : ajout d'informations, questions, impact sur les tâches, création de
-  nouvelle tâche, échéance détectée, révision confirmée, repli manuel sans LLM.
-- Objectifs de vie, question miroir et vérification de cohérence LLM optionnelle.
-- Obsidian : scan du vault, import des tâches, cases cochées, notes
-  `PRIORIS/<id>.md`, liens courts `[[PRIORIS/<id>]]`, synchro complète avec
-  aperçu avant/après.
-- LLM optionnel : aucun LLM, moteur local intégré `prioris/rules-v1`, GGUF local
-  autonome sans port, Ollama/LM Studio, OpenAI, Anthropic/Claude, custom,
-  GitHub Copilot.
+## À quoi ça sert
+
+PRIORIS aide quand une simple todo-list ne suffit plus :
+
+- choisir les tâches vraiment importantes au lieu de suivre seulement l'urgence ;
+- comparer des tâches personnelles, professionnelles, santé, finances ou famille ;
+- éviter les décisions impulsives grâce à un entretien guidé ;
+- produire un plan du jour compatible avec ton énergie, ta capacité et les dates
+  limites ;
+- garder une trace claire des raisons d'une priorité ;
+- synchroniser les tâches et les décisions avec un vault Obsidian.
+
+## Ce que tu peux faire
+
+- Ajouter une tâche, choisir une catégorie, une date limite éventuelle et répondre
+  à un entretien express ou complet.
+- Obtenir un score P1-P4 avec explication détaillée, contradictions détectées et
+  signaux de biais.
+- Générer un plan du jour qui met en concurrence score, urgence réelle, dates de
+  réalisation, énergie disponible et temps estimé.
+- Ajouter une information ou poser une question avec `/info` : PRIORIS propose
+  les tâches impactées, explique l'impact, suggère une révision ou une nouvelle
+  tâche, puis demande confirmation.
+- Gérer des objectifs de vie et relier les tâches à ces objectifs.
+- Scanner un vault Obsidian, importer les tâches `- [ ]`, écrire les notes
+  `PRIORIS/<id>.md`, cocher les tâches terminées et synchroniser avec aperçu
+  avant/après.
+
+## Interfaces
+
+| Interface | Usage | Points forts |
+|---|---|---|
+| GUI locale | Fenêtre simple sur la machine | Aucun compte, aucun serveur, aucun port local |
+| Telegram | Utilisation mobile et notifications | Pratique pour capturer et traiter les tâches partout |
+| Obsidian | Vault Markdown personnel | Notes lisibles, liens courts, historique durable |
+| LLM optionnel | Interprétation et aide à la décision | Questions plus pertinentes, analyse `/info`, reformulations |
+
+La GUI locale est le mode par défaut des releases. Telegram reste optionnel :
+il suffit de laisser le token vide pour ne pas l'utiliser.
+
+## Modes LLM
+
+PRIORIS fonctionne avec ou sans LLM :
+
+- **Sans LLM** : entretien à boutons, scoring local et plan du jour déterministe.
+- **LLM local autonome** : modèle GGUF embarqué, runtime `llama-simple`, sans
+  Ollama, sans LM Studio, sans serveur et sans port local.
+- **Ollama / LM Studio** : possible si tu préfères gérer tes modèles avec ces
+  outils.
+- **LLM externe** : OpenAI, Anthropic/Claude, endpoint compatible, GitHub
+  Copilot ou autre provider configuré.
+
+Dans la release standard, le modèle local 3B est déjà inclus et configuré.
+
+## Potentiel de la solution
+
+PRIORIS peut devenir un cockpit personnel de décision : priorités quotidiennes,
+suivi des objectifs, mémoire des arbitrages, audit des biais récurrents,
+rapports périodiques, synchronisation Markdown et assistance LLM contrôlée. La
+base actuelle privilégie la fiabilité : données locales, confirmations avant
+modification, logs, tests et séparation nette entre calcul déterministe et aide
+LLM.
 
 ## Architecture
 
@@ -30,7 +82,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             190 tests automatisés
+tests/             191 tests automatisés
 ```
 
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
@@ -83,7 +135,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu : `190 passed`.
+Résultat attendu : `191 passed`.
 
 Installation offline : fournir les roues Python dans `wheelhouse/`, puis :
 
@@ -188,7 +240,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-190 tests passent localement. Les améliorations restantes envisagées sont :
+191 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

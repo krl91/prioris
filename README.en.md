@@ -48,8 +48,9 @@ Download the archive matching your system from the latest release:
 
 Each archive contains the application, documentation, `config.example.toml`, an
 example Obsidian vault, a `wheelhouse/` for offline Python dependency
-installation, and the platform-specific `llama-simple` local runtime without a
-server.
+installation, the platform-specific `llama-simple` local runtime without a
+server, the `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` model, and a ready-to-run
+`config.toml` configured for the local GUI with that model.
 
 Install:
 
@@ -67,8 +68,8 @@ Windows PowerShell:
 
 For `local_gguf`, put the GGUF model in `models/`, for example
 `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`, then check `config.toml`.
-Models are published separately when their size is compatible with GitHub
-Releases.
+Recent releases already include the 3B model in each OS bundle. The 8B model
+remains optional and is downloaded separately.
 
 ```bash
 python3 -m venv .venv

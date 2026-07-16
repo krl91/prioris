@@ -10,6 +10,8 @@ permissions:
 
 env:
   LLAMA_CPP_REF: b10012
+  MODEL_3B_URL: https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_3B_FILE: Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
 
 jobs:
   obsidian-vault:
@@ -83,10 +85,11 @@ jobs:
           mkdir -p bundle/prioris-linux-x64/runtime bundle/prioris-linux-x64/models
           cp -R app/prioris app/ObsidianVault app/scripts bundle/prioris-linux-x64/
           cp app/pyproject.toml app/README.md app/README.en.md app/GUIDE.md app/GUIDE.en.md app/config.example.toml bundle/prioris-linux-x64/
+          cp app/config.release.toml bundle/prioris-linux-x64/config.toml
           cp -R runtime/linux-x64 bundle/prioris-linux-x64/runtime/
+          curl -L --retry 3 --retry-delay 5 "$MODEL_3B_URL" -o "bundle/prioris-linux-x64/models/$MODEL_3B_FILE"
           cat > bundle/prioris-linux-x64/models/README.md <<'EOF'
-          Put the GGUF model file here.
-          Recommended default:
+          Bundled default model:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           EOF
           chmod +x bundle/prioris-linux-x64/scripts/install_unix.sh bundle/prioris-linux-x64/scripts/run_unix.sh
@@ -153,10 +156,11 @@ jobs:
           mkdir -p bundle/prioris-macos-arm64/runtime bundle/prioris-macos-arm64/models
           cp -R app/prioris app/ObsidianVault app/scripts bundle/prioris-macos-arm64/
           cp app/pyproject.toml app/README.md app/README.en.md app/GUIDE.md app/GUIDE.en.md app/config.example.toml bundle/prioris-macos-arm64/
+          cp app/config.release.toml bundle/prioris-macos-arm64/config.toml
           cp -R runtime/macos-arm64 bundle/prioris-macos-arm64/runtime/
+          curl -L --retry 3 --retry-delay 5 "$MODEL_3B_URL" -o "bundle/prioris-macos-arm64/models/$MODEL_3B_FILE"
           cat > bundle/prioris-macos-arm64/models/README.md <<'EOF'
-          Put the GGUF model file here.
-          Recommended default:
+          Bundled default model:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           EOF
           chmod +x bundle/prioris-macos-arm64/scripts/install_unix.sh bundle/prioris-macos-arm64/scripts/run_unix.sh
@@ -234,10 +238,11 @@ jobs:
           New-Item -ItemType Directory -Force bundle/prioris-windows-x64/models | Out-Null
           Copy-Item app/prioris, app/ObsidianVault, app/scripts -Destination bundle/prioris-windows-x64 -Recurse
           Copy-Item app/pyproject.toml, app/README.md, app/README.en.md, app/GUIDE.md, app/GUIDE.en.md, app/config.example.toml -Destination bundle/prioris-windows-x64
+          Copy-Item app/config.release.toml -Destination bundle/prioris-windows-x64/config.toml
           Copy-Item runtime/windows-x64 -Destination bundle/prioris-windows-x64/runtime -Recurse
+          Invoke-WebRequest -Uri $env:MODEL_3B_URL -OutFile "bundle/prioris-windows-x64/models/$env:MODEL_3B_FILE"
           @"
-          Put the GGUF model file here.
-          Recommended default:
+          Bundled default model:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           "@ | Set-Content bundle/prioris-windows-x64/models/README.md
           py -3.11 -m pip download -d bundle/prioris-windows-x64/wheelhouse "python-telegram-bot>=21" "setuptools>=40.8.0" wheel

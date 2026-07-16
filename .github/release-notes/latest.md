@@ -12,6 +12,7 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 - Runtime local `llama-simple` inclus, sans serveur local et sans port exposé.
 - `ObsidianVault` inclus dans chaque bundle OS et aussi disponible séparément.
 - Installation offline des dépendances Python via `wheelhouse/`.
+- Tests automatisés inclus dans les bundles complets pour vérifier l'installation avec `python -m pytest`.
 - Workflow de release renforcé : les tests doivent passer avant le build, puis chaque bundle est vérifié après packaging.
 
 ## Quel fichier télécharger ?
@@ -38,6 +39,7 @@ Chaque archive `prioris-*` contient :
 - le runtime `llama-simple` dans `runtime/` ;
 - les scripts `scripts/install_*` et `scripts/run_*` ;
 - le dossier `wheelhouse/` pour installer les dépendances Python offline ;
+- le dossier `tests/` pour vérifier l'archive extraite ;
 - la documentation française et anglaise.
 
 ## Documentation
@@ -48,4 +50,4 @@ Chaque archive `prioris-*` contient :
 
 ## Vérifications
 
-Cette version a été construite par GitHub Actions. Le workflow exécute les tests avant le build, puis vérifie les archives produites : présence de `config.toml`, `ObsidianVault`, modèle GGUF, runtime `llama-simple`, installation offline et absence de binaires serveur/RPC.
+Cette version a été construite par GitHub Actions. Le workflow exécute les tests avant le build, puis vérifie les archives produites : présence de `config.toml`, `ObsidianVault`, modèle GGUF, runtime `llama-simple`, dossier `tests/`, installation offline, exécution de `python -m pytest` depuis l'archive extraite et absence de binaires serveur/RPC.

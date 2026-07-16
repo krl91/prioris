@@ -331,17 +331,27 @@ model = "rules-v1"
 
 7. Vérifie l'installation.
 
-Dans une archive release utilisateur, le dossier `tests/` n'est pas inclus :
-`pytest` peut donc afficher `collected 0 items`. Ce n'est pas une erreur. Pour
-vérifier une release, lance plutôt :
+Dans les releases récentes, le dossier `tests/` est inclus. La vérification
+complète est donc :
+
+```bash
+python -m pytest
+```
+
+Résultat attendu : `191 passed`.
+
+Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
 ```bash
 python -c "import prioris; print('PRIORIS import ok')"
 python -m prioris.bot.main
 ```
 
-Dans un clone complet du dépôt source, le dossier `tests/` est présent. Dans ce
-cas seulement, lance :
+Si tu utilises une ancienne archive qui n'embarque pas `tests/`, `pytest` peut
+afficher `collected 0 items`. Dans ce cas, ce n'est pas un échec de
+l'application ; utilise la vérification minimale ci-dessus.
+
+Dans un clone complet du dépôt source, lance aussi :
 
 ```bash
 pytest
@@ -1115,7 +1125,8 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
 **État tests** : 191 tests automatisés passent localement dans le dépôt source
-complet. Les archives release n'embarquent pas le dossier `tests/`.
+complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
+une vérification après extraction.
 
 **Reste à décider / améliorer** : scénarios comparés avancés, alertes
 d'équilibre de vie, rapport mensuel de biais, mémoire de décision plus riche,

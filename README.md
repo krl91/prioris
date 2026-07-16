@@ -106,7 +106,8 @@ Chaque archive contient l'application, la documentation, `config.example.toml`,
 un vault Obsidian exemple, un `wheelhouse/` pour installer les dépendances Python
 hors ligne, le runtime local `llama-simple` sans serveur pour la plateforme, le
 modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`, et un `config.toml` déjà
-réglé pour démarrer en GUI locale avec ce modèle.
+réglé pour démarrer en GUI locale avec ce modèle. Les nouvelles archives
+incluent aussi `tests/` pour vérifier l'installation après extraction.
 
 macOS Apple Silicon :
 
@@ -148,9 +149,15 @@ pytest
 
 Résultat attendu dans un clone complet du dépôt source : `191 passed`.
 
-Les archives release prêtes à l'emploi n'incluent pas le dossier `tests/`. Si tu
-lances `pytest` dedans et obtiens `collected 0 items`, c'est normal. Pour vérifier
-une release, lance plutôt :
+Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
+vérifier une release après extraction :
+
+```bash
+python -m pytest
+```
+
+Si tu utilises une ancienne archive et obtiens `collected 0 items`, elle
+n'embarquait pas encore les tests. Dans ce cas, vérifie au minimum :
 
 ```bash
 python -c "import prioris; print('PRIORIS import ok')"

@@ -210,17 +210,26 @@ model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
 
 7. Verify the installation.
 
-In a user release archive, the `tests/` folder is not included: `pytest` may
-therefore print `collected 0 items`. This is not an error. To verify a release,
-run instead:
+Recent releases include the `tests/` folder. The full verification is:
+
+```bash
+python -m pytest
+```
+
+Expected result: `191 passed`.
+
+Minimal verification if you only want to confirm that the application starts:
 
 ```bash
 python -c "import prioris; print('PRIORIS import ok')"
 python -m prioris.bot.main
 ```
 
-Only in a full source repository clone, where the `tests/` folder is present,
-run:
+If you use an older archive that does not include `tests/`, `pytest` may print
+`collected 0 items`. In that case, it is not an application failure; use the
+minimal verification above.
+
+In a full source repository clone, also run:
 
 ```bash
 pytest

@@ -102,7 +102,8 @@ Each archive contains the application, documentation, `config.example.toml`, an
 example Obsidian vault, a `wheelhouse/` for offline Python dependency
 installation, the platform-specific `llama-simple` local runtime without a
 server, the `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` model, and a ready-to-run
-`config.toml` configured for the local GUI with that model.
+`config.toml` configured for the local GUI with that model. New archives also
+include `tests/` so the installation can be verified after extraction.
 
 macOS Apple Silicon:
 
@@ -144,9 +145,15 @@ pytest
 
 Expected result in a full source repository clone: `191 passed`.
 
-Ready-to-run release archives do not include the `tests/` folder. If you run
-`pytest` there and get `collected 0 items`, that is normal. To verify a release,
-run instead:
+New ready-to-run release archives include `tests/`. To verify a release after
+extraction:
+
+```bash
+python -m pytest
+```
+
+If you use an older archive and get `collected 0 items`, it did not include the
+tests yet. In that case, verify at least:
 
 ```bash
 python -c "import prioris; print('PRIORIS import ok')"

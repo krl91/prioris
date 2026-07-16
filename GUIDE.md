@@ -22,7 +22,10 @@ Le chemin recommandé pour utiliser PRIORIS est le plus simple :
 | Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 
 3. Décompresse l'archive dans le dossier de ton choix.
-4. Lance le script fourni.
+4. Ouvre un terminal dans le dossier décompressé.
+5. Vérifie que `config.toml` existe déjà à la racine du dossier. Dans une
+   release normale, il est fourni et prêt à l'emploi.
+6. Lance le script fourni.
 
 macOS Apple Silicon :
 
@@ -61,6 +64,44 @@ L'archive contient déjà tout ce qu'il faut pour démarrer :
 La configuration par défaut démarre en **GUI locale**, sans Telegram, avec le
 LLM local GGUF 3B embarqué. Aucun téléchargement de modèle n'est fait au
 lancement.
+
+Si `config.toml` manque après extraction, recrée-le depuis l'exemple :
+
+macOS / Linux :
+
+```bash
+cp config.example.toml config.toml
+```
+
+Windows PowerShell :
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+Puis ouvre `config.toml` et vérifie au minimum :
+
+```toml
+[telegram]
+token = ""                  # vide = GUI locale, pas Telegram
+
+[obsidian]
+vault_path = "ObsidianVault"
+prioris_dir = "PRIORIS"
+
+[llm]
+enabled = true
+provider = "local_gguf"
+runner_path = "auto"
+model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+```
+
+Pour démarrer sans LLM, remplace seulement :
+
+```toml
+[llm]
+enabled = false
+```
 
 ### 1.2 Prérequis
 
@@ -180,44 +221,139 @@ aucun modèle séparé n'est requis. Seuls les providers externes optionnels
 authentification séparée. Le mode `local_gguf` reste offline lui aussi, mais
 la release doit contenir le binaire d'inférence et le fichier modèle GGUF.
 
+1. Place-toi dans le dossier du projet :
+
 ```bash
-# 1. Décompresser prioris-mvp-v0.1.zip, puis :
 cd prioris
+```
 
-# 2. Environnement virtuel (isole les dépendances)
+2. Crée l'environnement virtuel :
+
+macOS / Linux :
+
+```bash
 python3 -m venv .venv
-source .venv/bin/activate            # Windows : .venv\Scripts\activate
+source .venv/bin/activate
+```
 
-# 3. Installation online (développement)
+Windows PowerShell :
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+3. Installe PRIORIS :
+
+```bash
 pip install -e ".[dev]"
+```
 
-# 3 bis. Installation offline (release autoportée avec wheelhouse/)
+Si tu es dans une archive offline qui contient `wheelhouse/`, utilise plutôt :
+
+```bash
 pip install --no-index --find-links wheelhouse -e ".[dev]"
+```
 
-# 4. Vérification : les 190 tests doivent passer
+4. Crée le fichier de configuration :
+
+macOS / Linux :
+
+```bash
+cp config.example.toml config.toml
+```
+
+Windows PowerShell :
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+5. Ouvre `config.toml` et choisis le mode voulu.
+
+GUI locale sans Telegram :
+
+```toml
+[telegram]
+token = ""
+```
+
+Telegram :
+
+```toml
+[telegram]
+token = "1234567890:AAExEmPlE..."
+```
+
+Vault Obsidian :
+
+```toml
+[obsidian]
+vault_path = "/Users/example/Documents/ObsidianVault"
+prioris_dir = "PRIORIS"
+```
+
+Sous Windows, écris de préférence les chemins avec `/` :
+
+```toml
+[obsidian]
+vault_path = "C:/Users/Example/Documents/ObsidianVault"
+prioris_dir = "PRIORIS"
+```
+
+6. Choisis le mode LLM.
+
+Sans LLM :
+
+```toml
+[llm]
+enabled = false
+```
+
+LLM local GGUF embarqué :
+
+```toml
+[llm]
+enabled = true
+provider = "local_gguf"
+runner_path = "auto"
+model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+```
+
+Provider intégré sans vrai modèle génératif :
+
+```toml
+[llm]
+enabled = true
+provider = "prioris"
+model = "rules-v1"
+```
+
+7. Vérifie l'installation :
+
+```bash
 pytest
 ```
 
 Résultat attendu : `191 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
-### 1.5 Configurer
+### 1.6 Rappels pour Obsidian et Windows
 
-```bash
-cp config.example.toml config.toml
-```
-
-Éditer `config.toml` :
+Dans `config.toml`, la base SQLite est créée automatiquement au premier
+lancement :
 
 ```toml
-[telegram]
-token = "1234567890:AAExEmPlE..."    # le token de BotFather
-
 [database]
-path = "prioris.db"                   # créée automatiquement au 1er lancement
+path = "prioris.db"
+```
 
+Pour désactiver Obsidian, laisse `vault_path` vide :
+
+```toml
 [obsidian]
-vault_path = "/Users/prioris/MonVault"  # chemin ABSOLU du vault ; "" pour désactiver
+vault_path = ""
+prioris_dir = "PRIORIS"
 ```
 
 Sous Windows, écris de préférence :
@@ -238,17 +374,17 @@ vault_path = 'C:\Users\Example\Documents\Vault'
 L'export écrit uniquement `PRIORIS/Plan du jour.md` dans le vault — jamais
 ailleurs. Le dossier `PRIORIS/` est créé s'il n'existe pas.
 
-### 1.6 Premier lancement
+### 1.7 Premier lancement
 
 ```bash
 python -m prioris.bot.main
 ```
 
-Console : `PRIORIS démarré — mode boutons (MVP, sans LLM).`
-Dans Telegram, ouvrir ton bot et envoyer `/add Tester PRIORIS`. Si la question
-de catégorie apparaît, tout fonctionne.
+Si `[telegram] token = ""`, la fenêtre GUI locale s'ouvre. Si un token Telegram
+est renseigné, ouvre ton bot dans Telegram et envoie `/add Tester PRIORIS`. Si
+la question de catégorie apparaît, tout fonctionne.
 
-### 1.7 Lancement automatique (recommandé)
+### 1.8 Lancement automatique (recommandé)
 
 Le bot doit tourner en permanence pour l'usage quotidien.
 
@@ -296,7 +432,7 @@ journalctl -u prioris -f          # logs
 launchctl load ~/Library/LaunchAgents/net.prioris.bot.plist
 ```
 
-### 1.8 Conversation et LLM — 4 modes possibles
+### 1.9 Conversation et LLM — 4 modes possibles
 
 La couche conversation permet de **répondre en texte libre** pendant
 l'entretien : PRIORIS propose une interprétation, que tu confirmes d'un bouton.
@@ -644,7 +780,7 @@ d'entrer dans le calcul. Sortie invalide 2 fois → repli boutons avec diagnosti
 visible (`/llm` ou bouton **LLM**). Pour `/info`, un échec LLM réel est affiché
 comme une erreur d'analyse, pas comme « aucune modification proposée ».
 
-### 1.9 Sauvegarde
+### 1.10 Sauvegarde
 
 Tout l'état vit dans **un seul fichier** : `prioris.db`. Une copie datée
 suffit (cron quotidien recommandé) :

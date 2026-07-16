@@ -20,7 +20,10 @@ The recommended way to use PRIORIS is the simplest one:
 | Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
 
 3. Extract the archive wherever you want.
-4. Run the bundled script.
+4. Open a terminal in the extracted folder.
+5. Check that `config.toml` already exists at the folder root. In a normal
+   release, it is provided and ready to use.
+6. Run the bundled script.
 
 macOS Apple Silicon:
 
@@ -59,6 +62,44 @@ Each archive already contains everything needed to start:
 The default configuration starts the **local GUI**, without Telegram, using the
 bundled local GGUF 3B model. No model is downloaded at startup.
 
+If `config.toml` is missing after extraction, recreate it from the example:
+
+macOS / Linux:
+
+```bash
+cp config.example.toml config.toml
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+Then open `config.toml` and check at least:
+
+```toml
+[telegram]
+token = ""                  # empty = local GUI, no Telegram
+
+[obsidian]
+vault_path = "ObsidianVault"
+prioris_dir = "PRIORIS"
+
+[llm]
+enabled = true
+provider = "local_gguf"
+runner_path = "auto"
+model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+```
+
+To start without an LLM, replace only:
+
+```toml
+[llm]
+enabled = false
+```
+
 ## 2. What PRIORIS Does
 
 PRIORIS is a local-first decision-support assistant. It helps you capture tasks,
@@ -84,20 +125,96 @@ Info/question.
 
 ## 4. Developer or Manual Installation
 
+1. Open the project folder:
+
+```bash
+cd prioris
+```
+
+2. Create the virtual environment:
+
+macOS / Linux:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
 ```
 
-Expected result: `191 passed`.
+Windows PowerShell:
 
-For offline installation, provide a `wheelhouse/` directory and run:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+3. Install PRIORIS:
+
+```bash
+pip install -e ".[dev]"
+```
+
+If the archive contains `wheelhouse/`, install offline instead:
 
 ```bash
 pip install --no-index --find-links wheelhouse -e ".[dev]"
 ```
+
+4. Create `config.toml` from the example:
+
+macOS / Linux:
+
+```bash
+cp config.example.toml config.toml
+```
+
+Windows PowerShell:
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+5. Open `config.toml` and choose the interface:
+
+Local GUI without Telegram:
+
+```toml
+[telegram]
+token = ""
+```
+
+Telegram:
+
+```toml
+[telegram]
+token = "1234567890:AAExample..."
+```
+
+6. Choose the LLM mode:
+
+No LLM:
+
+```toml
+[llm]
+enabled = false
+```
+
+Standalone local GGUF:
+
+```toml
+[llm]
+enabled = true
+provider = "local_gguf"
+runner_path = "auto"
+model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+```
+
+7. Verify the installation:
+
+```bash
+pytest
+```
+
+Expected result: `191 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.

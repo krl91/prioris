@@ -12,6 +12,28 @@ env:
   LLAMA_CPP_REF: b10012
 
 jobs:
+  obsidian-vault:
+    name: Obsidian vault asset
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout PRIORIS
+        uses: actions/checkout@v4
+
+      - name: Package Obsidian vault
+        run: zip -r ObsidianVault.zip ObsidianVault -x '**/.DS_Store'
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ObsidianVault
+          path: ObsidianVault.zip
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ObsidianVault.zip
+
   linux-x64:
     name: Linux x64 runtime
     runs-on: ubuntu-24.04

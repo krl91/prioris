@@ -10,21 +10,30 @@ The recommended way to use PRIORIS is the simplest one:
 
 1. Open the latest GitHub release:
    <https://github.com/krl91/prioris/releases/latest>
-2. Download **one file**, matching your system:
+2. Download **one file**, matching your system. Do not download the `runtime-*`
+   archives alone: they do not contain the full application.
 
-| System | Archive to download |
-|---|---|
-| macOS Apple Silicon | `prioris-macos-arm64.zip` |
-| Windows x64 | `prioris-windows-x64.zip` |
-| Linux x64 | `prioris-linux-x64.tar.gz` |
+| System | Compressed file to download | Commands after extraction |
+|---|---|---|
+| macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
+| Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64`, then `.\scripts\install_windows.ps1`, then `.\scripts\run_windows.ps1` |
+| Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
 
 3. Extract the archive wherever you want.
 4. Run the bundled script.
 
-macOS / Linux:
+macOS Apple Silicon:
 
 ```bash
-cd prioris-*
+cd prioris-macos-arm64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Linux x64:
+
+```bash
+cd prioris-linux-x64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
@@ -82,7 +91,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result: `190 passed`.
+Expected result: `191 passed`.
 
 For offline installation, provide a `wheelhouse/` directory and run:
 

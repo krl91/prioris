@@ -89,11 +89,14 @@ vault, SQLite, Telegram nor any network client.
 The standard path is to download the latest ready-to-run archive:
 <https://github.com/krl91/prioris/releases/latest>
 
-Download the archive matching your system from the latest release:
+Download **one compressed file**, matching your system. Do not download the
+`runtime-*` assets alone: they do not contain the full application.
 
-- `prioris-macos-arm64.zip`
-- `prioris-windows-x64.zip`
-- `prioris-linux-x64.tar.gz`
+| System | File to download | Commands after extraction |
+|---|---|---|
+| macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
+| Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64`, then `.\scripts\install_windows.ps1`, then `.\scripts\run_windows.ps1` |
+| Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
 
 Each archive contains the application, documentation, `config.example.toml`, an
 example Obsidian vault, a `wheelhouse/` for offline Python dependency
@@ -101,10 +104,18 @@ installation, the platform-specific `llama-simple` local runtime without a
 server, the `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` model, and a ready-to-run
 `config.toml` configured for the local GUI with that model.
 
-Install:
+macOS Apple Silicon:
 
 ```bash
-cd prioris-*
+cd prioris-macos-arm64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Linux x64:
+
+```bash
+cd prioris-linux-x64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```

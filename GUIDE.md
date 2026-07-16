@@ -12,21 +12,30 @@ Le chemin recommandé pour utiliser PRIORIS est le plus simple :
 
 1. Ouvre la dernière release GitHub :
    <https://github.com/krl91/prioris/releases/latest>
-2. Télécharge **un seul fichier**, celui de ton système :
+2. Télécharge **un seul fichier**, celui de ton système. Ne prends pas les
+   archives `runtime-*` seules : elles ne contiennent pas toute l'application.
 
-| Système | Archive à télécharger |
-|---|---|
-| macOS Apple Silicon | `prioris-macos-arm64.zip` |
-| Windows x64 | `prioris-windows-x64.zip` |
-| Linux x64 | `prioris-linux-x64.tar.gz` |
+| Système | Fichier compressé à télécharger | Commandes après extraction |
+|---|---|---|
+| macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
+| Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64` puis `.\scripts\install_windows.ps1` puis `.\scripts\run_windows.ps1` |
+| Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 
 3. Décompresse l'archive dans le dossier de ton choix.
 4. Lance le script fourni.
 
-macOS / Linux :
+macOS Apple Silicon :
 
 ```bash
-cd prioris-*
+cd prioris-macos-arm64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Linux x64 :
+
+```bash
+cd prioris-linux-x64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
@@ -189,7 +198,7 @@ pip install --no-index --find-links wheelhouse -e ".[dev]"
 pytest
 ```
 
-Résultat attendu : `190 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `191 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.5 Configurer

@@ -36,9 +36,10 @@ tests/             190 automated tests
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
 vault, SQLite, Telegram nor any network client.
 
-## Installation
+## Install from the Release
 
-## Ready-to-install Release
+The standard path is to download the latest ready-to-run archive:
+<https://github.com/krl91/prioris/releases/latest>
 
 Download the archive matching your system from the latest release:
 
@@ -55,6 +56,7 @@ server, the `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` model, and a ready-to-run
 Install:
 
 ```bash
+cd prioris-*
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
@@ -62,6 +64,7 @@ Install:
 Windows PowerShell:
 
 ```powershell
+cd prioris-windows-x64
 .\scripts\install_windows.ps1
 .\scripts\run_windows.ps1
 ```
@@ -70,6 +73,8 @@ For `local_gguf`, put the GGUF model in `models/`, for example
 `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`, then check `config.toml`.
 Recent releases already include the 3B model in each OS bundle. The 8B model
 remains optional and is downloaded separately.
+
+## Developer Installation
 
 ```bash
 python3 -m venv .venv

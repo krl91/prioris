@@ -4,9 +4,56 @@ MVP V0.1 · pour le dossier de conception, voir `conception-assistant-decision.m
 
 ---
 
-## Partie 1 — Installation
+## Partie 1 — Installation rapide depuis une release
 
-### 1.1 Prérequis
+### 1.1 Télécharger l'archive de ton système
+
+Le chemin recommandé pour utiliser PRIORIS est le plus simple :
+
+1. Ouvre la dernière release GitHub :
+   <https://github.com/krl91/prioris/releases/latest>
+2. Télécharge **un seul fichier**, celui de ton système :
+
+| Système | Archive à télécharger |
+|---|---|
+| macOS Apple Silicon | `prioris-macos-arm64.zip` |
+| Windows x64 | `prioris-windows-x64.zip` |
+| Linux x64 | `prioris-linux-x64.tar.gz` |
+
+3. Décompresse l'archive dans le dossier de ton choix.
+4. Lance le script fourni.
+
+macOS / Linux :
+
+```bash
+cd prioris-*
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Windows PowerShell :
+
+```powershell
+cd prioris-windows-x64
+.\scripts\install_windows.ps1
+.\scripts\run_windows.ps1
+```
+
+L'archive contient déjà tout ce qu'il faut pour démarrer :
+
+- l'application PRIORIS ;
+- la documentation ;
+- `config.toml` prêt à l'emploi ;
+- le vault `ObsidianVault` ;
+- les dépendances Python dans `wheelhouse/` pour une installation offline ;
+- le runtime local `llama-simple` sans serveur et sans port local ;
+- le modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`.
+
+La configuration par défaut démarre en **GUI locale**, sans Telegram, avec le
+LLM local GGUF 3B embarqué. Aucun téléchargement de modèle n'est fait au
+lancement.
+
+### 1.2 Prérequis
 
 | Besoin | Détail |
 |---|---|
@@ -15,8 +62,9 @@ MVP V0.1 · pour le dossier de conception, voir `conception-assistant-decision.m
 | Une machine allumée | PC perso ou NAS — le bot doit tourner pour répondre (mode Telegram) |
 | (Optionnel) Vault Obsidian | pour l'export du plan du jour |
 
-Aucun LLM, aucune clé API, aucun service cloud n'est nécessaire : le MVP
-fonctionne entièrement en local.
+Aucun compte, aucune clé API et aucun service cloud ne sont nécessaires pour le
+mode release par défaut. Telegram, Ollama/LM Studio ou les LLM externes sont des
+options avancées.
 
 **PRIORIS propose deux modes d'interface, contrôlés par `config.toml` :**
 
@@ -25,7 +73,7 @@ fonctionne entièrement en local.
 | **Telegram** | `token = "123456:..."` | Mobile, notifications push, disponible de partout | Compte Telegram + bot à créer |
 | **Local (GUI)** | `token = ""` ou absent | Zéro compte requis, aucune dépendance externe | Même machine uniquement, pas de mobile |
 
-### 1.2 Mode local — interface graphique (sans Telegram)
+### 1.3 Mode local — interface graphique (sans Telegram)
 
 Si tu préfères ne pas utiliser Telegram, laisse le champ `token` vide (ou
 absent) dans `config.toml`. PRIORIS démarre alors une fenêtre graphique locale
@@ -89,7 +137,7 @@ La configuration `"fr"` ou l'absence de section `[ui]` conserve le français.
 Le scoring ne change pas : seule la formulation des questions/options est
 traduite.
 
-### 1.3 Créer le bot Telegram (5 min) — mode Telegram uniquement
+### 1.4 Créer le bot Telegram (5 min) — mode Telegram uniquement
 
 1. Dans Telegram, ouvrir une conversation avec **@BotFather**.
 2. Envoyer `/newbot`.
@@ -112,7 +160,7 @@ llm - Diagnostic du LLM
 
 Le bot est personnel : ne partage pas le token (quiconque l'a contrôle le bot).
 
-### 1.4 Installer PRIORIS
+### 1.5 Installation développeur ou manuelle
 
 PRIORIS doit pouvoir être installé **offline** : l'application ne télécharge
 ni dépendances, ni modèle LLM au démarrage. En environnement sans réseau, il

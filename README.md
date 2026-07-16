@@ -36,9 +36,10 @@ tests/             190 tests automatisés
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
 store, ni bot, ni vault, ni SQLite, ni Telegram, ni client réseau.
 
-## Installation
+## Installation depuis la release
 
-## Release prête à installer
+Le chemin standard est de télécharger la dernière archive prête à l'emploi :
+<https://github.com/krl91/prioris/releases/latest>
 
 Télécharge l'archive correspondant à ton système depuis la dernière release :
 
@@ -55,6 +56,7 @@ réglé pour démarrer en GUI locale avec ce modèle.
 Installation :
 
 ```bash
+cd prioris-*
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
@@ -62,6 +64,7 @@ Installation :
 Windows PowerShell :
 
 ```powershell
+cd prioris-windows-x64
 .\scripts\install_windows.ps1
 .\scripts\run_windows.ps1
 ```
@@ -70,6 +73,8 @@ Pour le mode `local_gguf`, place le modèle GGUF dans `models/`, par exemple
 `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`, puis vérifie `config.toml`.
 Dans les releases récentes, le modèle 3B est déjà inclus dans le bundle OS. Le
 8B reste optionnel et se télécharge séparément.
+
+## Installation développeur
 
 ```bash
 python3 -m venv .venv

@@ -4,7 +4,53 @@ This is the English companion to `GUIDE.md`. The French guide remains the
 canonical operational document; this file mirrors the current implementation
 state for English readers.
 
-## 1. What PRIORIS Does
+## 1. Quick Install from a Release
+
+The recommended way to use PRIORIS is the simplest one:
+
+1. Open the latest GitHub release:
+   <https://github.com/krl91/prioris/releases/latest>
+2. Download **one file**, matching your system:
+
+| System | Archive to download |
+|---|---|
+| macOS Apple Silicon | `prioris-macos-arm64.zip` |
+| Windows x64 | `prioris-windows-x64.zip` |
+| Linux x64 | `prioris-linux-x64.tar.gz` |
+
+3. Extract the archive wherever you want.
+4. Run the bundled script.
+
+macOS / Linux:
+
+```bash
+cd prioris-*
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Windows PowerShell:
+
+```powershell
+cd prioris-windows-x64
+.\scripts\install_windows.ps1
+.\scripts\run_windows.ps1
+```
+
+Each archive already contains everything needed to start:
+
+- the PRIORIS application;
+- documentation;
+- a ready-to-run `config.toml`;
+- the `ObsidianVault` folder;
+- Python dependencies in `wheelhouse/` for offline installation;
+- the local `llama-simple` runtime, with no server and no local port;
+- the `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` model.
+
+The default configuration starts the **local GUI**, without Telegram, using the
+bundled local GGUF 3B model. No model is downloaded at startup.
+
+## 2. What PRIORIS Does
 
 PRIORIS is a local-first decision-support assistant. It helps you capture tasks,
 evaluate them through a guided interview, calculate deterministic priorities,
@@ -15,7 +61,7 @@ The LLM layer is optional. It can interpret free-text answers, suggest goals,
 analyze `/info` messages and propose revisions, but it never writes changes
 without confirmation and never computes the priority by itself.
 
-## 2. Interfaces
+## 3. Interfaces
 
 PRIORIS has two interfaces:
 
@@ -27,7 +73,7 @@ The GUI exposes the same core workflows: add task, daily plan, goals, list,
 scan Obsidian, sync Obsidian, LLM diagnostics, mark done, rationale, and
 Info/question.
 
-## 3. Installation
+## 4. Developer or Manual Installation
 
 ```bash
 python3 -m venv .venv
@@ -47,7 +93,7 @@ pip install --no-index --find-links wheelhouse -e ".[dev]"
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
 
-## 4. Configuration
+## 5. Configuration
 
 Minimal GUI configuration:
 
@@ -133,7 +179,7 @@ When an LLM is available, PRIORIS also asks 3 task-specific helper questions
 before the instinctive quadrant question; they help the user reason about
 urgent vs important but never affect the score directly.
 
-## 5. Core Workflow
+## 6. Core Workflow
 
 1. Add a task with `/add <title>` or the GUI button.
 2. Choose a category.

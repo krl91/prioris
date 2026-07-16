@@ -255,6 +255,10 @@ Si tu es dans une archive offline qui contient `wheelhouse/`, utilise plutôt :
 pip install --no-index --find-links wheelhouse -e ".[dev]"
 ```
 
+Les scripts `scripts/install_unix.sh` et `scripts/install_windows.ps1` font déjà
+cette installation avec l'extra `dev`, afin que `python -m pytest` soit
+disponible dans la release.
+
 4. Crée le fichier de configuration :
 
 macOS / Linux :

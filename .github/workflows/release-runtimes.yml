@@ -151,7 +151,7 @@ jobs:
           tar -xzf prioris-linux-x64.tar.gz -C verify-linux
           cd verify-linux/prioris-linux-x64
           python3 -m venv .venv
-          .venv/bin/python -m pip install --no-index --find-links wheelhouse -e .
+          .venv/bin/python -m pip install --no-index --find-links wheelhouse -e ".[dev]"
           .venv/bin/python -m pytest
           .venv/bin/python -c "import pathlib, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); assert cfg['telegram']['token'] == ''; assert cfg['llm']['enabled'] is True; assert cfg['llm']['provider'] == 'local_gguf'; assert cfg['llm']['model'] == 'models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf'; runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/linux-x64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir()"
 
@@ -241,7 +241,7 @@ jobs:
           unzip -q prioris-macos-arm64.zip -d verify-macos
           cd verify-macos/prioris-macos-arm64
           python3 -m venv .venv
-          .venv/bin/python -m pip install --no-index --find-links wheelhouse -e .
+          .venv/bin/python -m pip install --no-index --find-links wheelhouse -e ".[dev]"
           .venv/bin/python -m pytest
           .venv/bin/python -c "import pathlib, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); assert cfg['telegram']['token'] == ''; assert cfg['llm']['enabled'] is True; assert cfg['llm']['provider'] == 'local_gguf'; assert cfg['llm']['model'] == 'models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf'; runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/macos-arm64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir()"
 
@@ -353,7 +353,7 @@ jobs:
           tar -xf prioris-windows-x64.zip -C verify-windows
           Set-Location verify-windows/prioris-windows-x64
           py -3.11 -m venv .venv
-          .\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -e .
+          .\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -e ".[dev]"
           .\.venv\Scripts\python.exe -m pytest
           .\.venv\Scripts\python.exe -c "import pathlib, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); assert cfg['telegram']['token'] == ''; assert cfg['llm']['enabled'] is True; assert cfg['llm']['provider'] == 'local_gguf'; assert cfg['llm']['model'] == 'models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf'; runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/windows-x64/llama-simple.exe'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir()"
 

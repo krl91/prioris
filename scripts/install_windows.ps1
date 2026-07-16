@@ -7,7 +7,7 @@ if ($env:PYTHON_BIN) {
 } else {
     py -3.11 -m venv .venv
 }
-& .\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -e .
+& .\.venv\Scripts\python.exe -m pip install --no-index --find-links wheelhouse -e ".[dev]"
 
 if (-not (Test-Path config.toml)) {
     Copy-Item config.example.toml config.toml

@@ -7,7 +7,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 "$PYTHON_BIN" -m venv .venv
 . .venv/bin/activate
-python -m pip install --no-index --find-links wheelhouse -e .
+python -m pip install --no-index --find-links wheelhouse -e ".[dev]"
 
 if [ ! -f config.toml ]; then
   cp config.example.toml config.toml

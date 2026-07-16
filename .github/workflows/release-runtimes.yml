@@ -68,7 +68,7 @@ jobs:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           EOF
           chmod +x bundle/prioris-linux-x64/scripts/install_unix.sh bundle/prioris-linux-x64/scripts/run_unix.sh
-          python3 -m pip download -d bundle/prioris-linux-x64/wheelhouse "python-telegram-bot>=21"
+          python3 -m pip download -d bundle/prioris-linux-x64/wheelhouse "python-telegram-bot>=21" "setuptools>=40.8.0" wheel
           tar -czf prioris-linux-x64.tar.gz -C bundle prioris-linux-x64
 
       - name: Upload app bundle artifact
@@ -138,7 +138,7 @@ jobs:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           EOF
           chmod +x bundle/prioris-macos-arm64/scripts/install_unix.sh bundle/prioris-macos-arm64/scripts/run_unix.sh
-          python3 -m pip download -d bundle/prioris-macos-arm64/wheelhouse "python-telegram-bot>=21"
+          python3 -m pip download -d bundle/prioris-macos-arm64/wheelhouse "python-telegram-bot>=21" "setuptools>=40.8.0" wheel
           (cd bundle && zip -r ../prioris-macos-arm64.zip prioris-macos-arm64)
 
       - name: Upload app bundle artifact
@@ -218,7 +218,7 @@ jobs:
           Recommended default:
           Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
           "@ | Set-Content bundle/prioris-windows-x64/models/README.md
-          py -3.11 -m pip download -d bundle/prioris-windows-x64/wheelhouse "python-telegram-bot>=21"
+          py -3.11 -m pip download -d bundle/prioris-windows-x64/wheelhouse "python-telegram-bot>=21" "setuptools>=40.8.0" wheel
           Compress-Archive -Path bundle/prioris-windows-x64 -DestinationPath prioris-windows-x64.zip -Force
 
       - name: Upload app bundle artifact

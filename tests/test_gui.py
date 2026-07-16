@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("tkinter")
+
 from prioris.bot.main import _needs_gui
 from prioris.core.axes import (AXIS_LABELS, ESTIMATION_MIN, Axis, Effort,
                                  Estimation, Incertitude, Priorite)

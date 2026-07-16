@@ -1,11 +1,18 @@
 [project]
 name = "prioris"
-version = "0.4.1"
+version = "0.4.5"
 description = "Assistant personnel d'aide à la décision — MVP (scoring déterministe, Telegram, SQLite, export Obsidian)"
 requires-python = ">=3.11"
 dependencies = [
     "python-telegram-bot>=21",
 ]
+
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["prioris*"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

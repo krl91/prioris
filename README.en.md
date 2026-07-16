@@ -38,6 +38,38 @@ vault, SQLite, Telegram nor any network client.
 
 ## Installation
 
+## Ready-to-install Release
+
+Download the archive matching your system from the latest release:
+
+- `prioris-macos-arm64.zip`
+- `prioris-windows-x64.zip`
+- `prioris-linux-x64.tar.gz`
+
+Each archive contains the application, documentation, `config.example.toml`, an
+example Obsidian vault, a `wheelhouse/` for offline Python dependency
+installation, and the platform-specific `llama-simple` local runtime without a
+server.
+
+Install:
+
+```bash
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\install_windows.ps1
+.\scripts\run_windows.ps1
+```
+
+For `local_gguf`, put the GGUF model in `models/`, for example
+`models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf`, then check `config.toml`.
+Models are published separately when their size is compatible with GitHub
+Releases.
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate

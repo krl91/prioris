@@ -1,4 +1,4 @@
-# PRIORIS v0.4.9
+# PRIORIS v0.4.10
 
 PRIORIS est un assistant personnel d'aide à la décision pour transformer une liste de tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian synchronisées.
 
@@ -6,7 +6,8 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 
 ## Nouveautés principales
 
-- **Fix macOS Gatekeeper** : le runtime `llama-simple` est désormais signé avec Hardened Runtime (`--options runtime`), ce qui le place dans la catégorie « développeur non identifié » (bypassable) plutôt que « malware potentiel » sur macOS 14+ Sonoma et 15+ Sequoia.
+- **Fix dylib rpath macOS** : le binaire `llama-simple` embarquait le chemin absolu du répertoire de build CI comme `@rpath`, rendant `libllama.0.dylib` introuvable sur la machine de l'utilisateur. Le rpath est maintenant fixé à `@executable_path` pour que `dyld` cherche les dylibs dans le même répertoire que le binaire.
+- **Fix macOS Gatekeeper** : le runtime `llama-simple` est signé avec Hardened Runtime (`--options runtime`), ce qui le place dans la catégorie « développeur non identifié » (bypassable) plutôt que « malware potentiel » sur macOS 14+ Sonoma et 15+ Sequoia.
 - **Script `allow-macos.sh`** inclus dans le zip runtime : une seule commande (`chmod +x allow-macos.sh && ./allow-macos.sh`) retire l'attribut quarantaine sans passer par les Réglages Système.
 - Les scripts `install_unix.sh` et `run_unix.sh` continuent de retirer automatiquement la quarantaine sur l'intégralité du dossier extrait.
 

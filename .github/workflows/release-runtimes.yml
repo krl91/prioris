@@ -203,12 +203,17 @@ jobs:
           cp build/bin/llama-simple runtime/macos-arm64/
           find build/bin -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec cp -P {} runtime/macos-arm64/ \;
           ! find runtime/macos-arm64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
+          # Fix rpath: the binary embeds the CI build dir as @rpath, which does not
+          # exist on the user's machine. Add @executable_path so dyld finds the
+          # dylibs in the same directory as llama-simple after extraction.
+          install_name_tool -add_rpath @executable_path runtime/macos-arm64/llama-simple
           # Sign the main executable with Hardened Runtime so macOS Gatekeeper
           # treats it as "unidentified developer" (bypassable) rather than
           # "potential malware" (not bypassable) on macOS 14+ Sonoma / 15+ Sequoia.
           codesign --force --sign - --options runtime --timestamp=none runtime/macos-arm64/llama-simple
           find runtime/macos-arm64 -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec codesign --force --sign - --timestamp=none {} \;
           codesign --verify --verbose runtime/macos-arm64/llama-simple
+          otool -l runtime/macos-arm64/llama-simple | grep -A2 LC_RPATH | grep path | grep '@executable_path'
           # Helper script so users who download only the runtime zip can bypass
           # Gatekeeper with a single command instead of going through System Settings.
           cat > runtime/macos-arm64/allow-macos.sh << 'ALLOW_EOF'

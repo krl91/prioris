@@ -1,4 +1,4 @@
-# PRIORIS v0.4.11
+# PRIORIS v0.4.12
 
 PRIORIS est un assistant personnel d'aide à la décision pour transformer une liste de tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian synchronisées.
 
@@ -6,6 +6,18 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 
 ## Nouveautés principales
 
+- **Réponses libres LLM sur tout l'entretien** : en GUI et Telegram, quand le
+  LLM est disponible, l'utilisateur peut répondre en texte libre à toutes les
+  questions à choix. PRIORIS interprète, propose l'option comprise, puis demande
+  confirmation avant toute écriture ou recalcul.
+- **Fallback boutons si le LLM est KO/offline** : aucun blocage utilisateur,
+  l'interface explique l'échec et conserve le mode boutons.
+- **Challenge anti-biais après l'instinct** : la réponse à « Instinctivement,
+  tu la classes comment ? » ne force pas le score. Elle sert à générer 3
+  questions ciblées pour vérifier vraie urgence, pression sociale, manque
+  d'information ou importance sous-estimée.
+- **Clarifications et question miroir en texte libre** : le LLM peut aussi
+  interpréter ces réponses dynamiques, toujours avec confirmation.
 - **Fix dylib Team ID macOS (Hardened Runtime)** : avec `--options runtime`, macOS vérifie que les dylibs chargées ont le même Team ID que le binaire. Les deux étant signés en ad-hoc indépendamment, macOS les rejetait avec `different Team IDs`. Fix : entitlement `com.apple.security.cs.disable-library-validation` ajouté à la signature de `llama-simple`.
 - **Fix dylib rpath macOS** : `@executable_path` ajouté via `install_name_tool` pour que `dyld` trouve `libllama.0.dylib` dans le même répertoire que le binaire.
 - **Test unitaire** `tests/test_runtime_macos.py` : vérifie le rpath et l’entitlement sur macOS — ces deux régressions seront désormais détectées automatiquement dans le CI.

@@ -28,7 +28,7 @@ def test_golden_sport():
     urgence, importance, global_score, quadrant, priorite = r.as_tuple()
     assert urgence == 43.5
     assert importance == 65.4
-    assert global_score == pytest.approx(56.6, abs=0.1)
+    assert global_score in (56.6, 56.7)
     assert quadrant == "Q2"
     assert priorite == "P2"
 

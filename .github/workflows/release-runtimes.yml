@@ -210,10 +210,25 @@ jobs:
           # Sign the main executable with Hardened Runtime so macOS Gatekeeper
           # treats it as "unidentified developer" (bypassable) rather than
           # "potential malware" (not bypassable) on macOS 14+ Sonoma / 15+ Sequoia.
-          codesign --force --sign - --options runtime --timestamp=none runtime/macos-arm64/llama-simple
+          # The disable-library-validation entitlement is required because Hardened
+          # Runtime enforces matching Team IDs on loaded dylibs; since all binaries
+          # here are ad-hoc signed (Team ID = null), each has its own identity and
+          # strict validation would reject libllama.0.dylib.
+          cat > /tmp/llama-entitlements.plist << 'ENTS_EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.cs.disable-library-validation</key>
+              <true/>
+          </dict>
+          </plist>
+          ENTS_EOF
+          codesign --force --sign - --options runtime --entitlements /tmp/llama-entitlements.plist --timestamp=none runtime/macos-arm64/llama-simple
           find runtime/macos-arm64 -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec codesign --force --sign - --timestamp=none {} \;
           codesign --verify --verbose runtime/macos-arm64/llama-simple
           otool -l runtime/macos-arm64/llama-simple | grep -A2 LC_RPATH | grep path | grep '@executable_path'
+          codesign -dv --entitlements - runtime/macos-arm64/llama-simple | grep -q 'disable-library-validation'
           # Helper script so users who download only the runtime zip can bypass
           # Gatekeeper with a single command instead of going through System Settings.
           cat > runtime/macos-arm64/allow-macos.sh << 'ALLOW_EOF'

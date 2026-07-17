@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 if [ "$(uname -s)" = "Darwin" ] && command -v xattr >/dev/null 2>&1; then
-  xattr -dr com.apple.quarantine runtime/macos-arm64 2>/dev/null || true
+  xattr -dr com.apple.quarantine . 2>/dev/null || true
 fi
 
 "$PYTHON_BIN" -m venv .venv

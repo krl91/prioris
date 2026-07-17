@@ -35,10 +35,12 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
-Le runtime macOS `llama-simple` est signé en mode ad-hoc dans la release. Le
-script `install_unix.sh` retire aussi l'attribut de quarantaine macOS sur le
-runtime inclus. Ce n'est pas une notarisation Apple Developer complète, mais cela
-évite le blocage Gatekeeper courant sur le binaire CLI téléchargé dans l'archive.
+Le runtime macOS `llama-simple` est signé en mode ad-hoc dans la release. Les
+scripts `install_unix.sh` et `run_unix.sh` retirent aussi l'attribut de
+quarantaine macOS sur tout le dossier extrait, et le fournisseur LLM local refait
+ce nettoyage juste avant d'appeler le binaire. Ce n'est pas une notarisation
+Apple Developer complète, mais cela évite le blocage Gatekeeper courant sur
+l'archive téléchargée.
 
 Linux x64 :
 

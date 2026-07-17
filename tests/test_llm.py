@@ -102,6 +102,34 @@ def test_local_gguf_auto_utilise_llama_simple_linux(monkeypatch):
     assert model == "m.gguf"
 
 
+def test_local_gguf_retire_quarantaine_macos(monkeypatch, tmp_path):
+    import prioris.llm.local_gguf as local_mod
+    calls = []
+
+    runner_dir = tmp_path / "runtime" / "macos-arm64"
+    runner_dir.mkdir(parents=True)
+    runner = runner_dir / "llama-simple"
+    runner.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        class Proc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return Proc()
+
+    monkeypatch.setattr(local_mod.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(local_mod.subprocess, "run", fake_run)
+
+    local_mod._clear_macos_quarantine(runner)
+
+    assert calls == [(
+        ["xattr", "-dr", "com.apple.quarantine", str(runner_dir)],
+        {"check": False, "capture_output": True, "text": True, "timeout": 10},
+    )]
+
+
 def test_from_dict():
     cfg = LLMConfig.from_dict({"enabled": True, "provider": "LMStudio",
                                "model": "qwen"})

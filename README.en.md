@@ -113,9 +113,11 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
-On macOS, run `install_unix.sh` before the first launch: `llama-simple` is
-ad-hoc signed and the script removes the quarantine attribute from the bundled
-binary.
+On macOS, run `install_unix.sh` before the first launch. `llama-simple` is
+ad-hoc signed, and the scripts remove the macOS quarantine attribute from the
+whole extracted folder. The local LLM provider also repeats that cleanup just
+before calling the binary. This is not full Apple Developer notarization, but it
+avoids the common Gatekeeper block on the downloaded archive.
 
 Linux x64:
 

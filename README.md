@@ -117,9 +117,12 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
-Sur macOS, lance bien `install_unix.sh` avant le premier démarrage : le runtime
-`llama-simple` est signé ad-hoc et le script retire la quarantaine du binaire
-inclus dans l'archive.
+Sur macOS, lance bien `install_unix.sh` avant le premier démarrage. Le runtime
+`llama-simple` est signé ad-hoc, et les scripts retirent la quarantaine macOS
+sur tout le dossier extrait. Le fournisseur LLM local refait aussi ce nettoyage
+juste avant d'appeler le binaire. Ce n'est pas une notarisation Apple Developer
+complète, mais cela évite le blocage Gatekeeper courant sur l'archive
+téléchargée.
 
 Linux x64 :
 

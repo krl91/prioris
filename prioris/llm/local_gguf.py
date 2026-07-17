@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 import re
+import platform
 from pathlib import Path
 
 from .client_types import LocalGGUFConfig
@@ -53,6 +54,19 @@ def _is_llama_simple(runner: Path) -> bool:
     return "example usage:" in help_text and "[-n n_predict]" in help_text
 
 
+def _clear_macos_quarantine(runner: Path) -> None:
+    """Best effort: downloaded release archives can quarantine bundled binaries."""
+    if platform.system() != "Darwin":
+        return
+    subprocess.run(
+        ["xattr", "-dr", "com.apple.quarantine", str(runner.parent)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
 def _clean_stdout(text: str) -> str:
     """llama.cpp binaries may mix logs, prompt and answer on stdout."""
     fenced = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.S)
@@ -72,6 +86,7 @@ def chat(cfg: LocalGGUFConfig, system: str, user: str) -> str:
         raise FileNotFoundError(f"runtime local introuvable : {runner}")
     if not model.exists():
         raise FileNotFoundError(f"modèle local introuvable : {model}")
+    _clear_macos_quarantine(runner)
     _assert_no_embedded_server(runner)
 
     prompt = (

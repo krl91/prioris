@@ -243,8 +243,9 @@ jobs:
           mkdir verify-macos
           unzip -q prioris-macos-arm64.zip -d verify-macos
           cd verify-macos/prioris-macos-arm64
-          python3 -m venv .venv
-          .venv/bin/python -m pip install --no-index --find-links wheelhouse -e ".[dev]"
+          xattr -w com.apple.quarantine "0081;00000000;GitHub Actions;PRIORIS" runtime/macos-arm64/llama-simple
+          ./scripts/install_unix.sh
+          ! xattr -p com.apple.quarantine runtime/macos-arm64/llama-simple
           .venv/bin/python -m pytest
           .venv/bin/python -c "import pathlib, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); assert cfg['telegram']['token'] == ''; assert cfg['llm']['enabled'] is True; assert cfg['llm']['provider'] == 'local_gguf'; assert cfg['llm']['model'] == 'models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf'; runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/macos-arm64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir()"
 

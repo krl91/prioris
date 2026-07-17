@@ -35,12 +35,31 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
-Le runtime macOS `llama-simple` est signé en mode ad-hoc dans la release. Les
-scripts `install_unix.sh` et `run_unix.sh` retirent aussi l'attribut de
-quarantaine macOS sur tout le dossier extrait, et le fournisseur LLM local refait
-ce nettoyage juste avant d'appeler le binaire. Ce n'est pas une notarisation
-Apple Developer complète, mais cela évite le blocage Gatekeeper courant sur
-l'archive téléchargée.
+Le runtime macOS `llama-simple` est signé en mode ad-hoc avec Hardened Runtime
+dans la release. Les scripts `install_unix.sh` et `run_unix.sh` retirent aussi
+l'attribut de quarantaine macOS sur tout le dossier extrait, et le fournisseur
+LLM local refait ce nettoyage juste avant d'appeler le binaire. Ce n'est pas une
+notarisation Apple Developer complète, mais cela évite le blocage Gatekeeper
+courant sur l'archive téléchargée.
+
+> **Si macOS bloque `llama-simple` avec « Apple n'a pas pu confirmer… »**
+> (dialog Gatekeeper au premier lancement) : c'est normal pour un binaire
+> téléchargé sans notarisation Apple payante. Deux façons de l'autoriser :
+>
+> **Option A – script inclus (zip runtime uniquement)**
+> ```bash
+> chmod +x allow-macos.sh && ./allow-macos.sh
+> ```
+> Ce script retire l'attribut quarantaine sur tout le dossier.
+>
+> **Option B – via l'app complète (recommandé)**
+> Passe par `./scripts/install_unix.sh` : le script retire automatiquement
+> la quarantaine sur l'intégralité du dossier extrait.
+>
+> **Option C – manuellement**
+> ```bash
+> xattr -dr com.apple.quarantine /chemin/vers/prioris-macos-arm64
+> ```
 
 Linux x64 :
 

@@ -1,4 +1,4 @@
-# PRIORIS v0.4.6
+# PRIORIS v0.4.9
 
 PRIORIS est un assistant personnel d'aide à la décision pour transformer une liste de tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian synchronisées.
 
@@ -6,15 +6,9 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 
 ## Nouveautés principales
 
-- Archives complètes par OS, prêtes à installer.
-- Configuration `config.toml` incluse et prête pour la GUI locale.
-- Modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` inclus dans chaque bundle OS.
-- Runtime local `llama-simple` inclus, sans serveur local et sans port exposé.
-- Runtime macOS signé ad-hoc ; les scripts et le fournisseur LLM local retirent la quarantaine macOS du dossier extrait avant l'inférence.
-- `ObsidianVault` inclus dans chaque bundle OS et aussi disponible séparément.
-- Installation offline des dépendances Python via `wheelhouse/`.
-- Tests automatisés inclus dans les bundles complets pour vérifier l'installation avec `python -m pytest`.
-- Workflow de release renforcé : les tests doivent passer avant le build, puis chaque bundle est vérifié après packaging.
+- **Fix macOS Gatekeeper** : le runtime `llama-simple` est désormais signé avec Hardened Runtime (`--options runtime`), ce qui le place dans la catégorie « développeur non identifié » (bypassable) plutôt que « malware potentiel » sur macOS 14+ Sonoma et 15+ Sequoia.
+- **Script `allow-macos.sh`** inclus dans le zip runtime : une seule commande (`chmod +x allow-macos.sh && ./allow-macos.sh`) retire l'attribut quarantaine sans passer par les Réglages Système.
+- Les scripts `install_unix.sh` et `run_unix.sh` continuent de retirer automatiquement la quarantaine sur l'intégralité du dossier extrait.
 
 ## Quel fichier télécharger ?
 

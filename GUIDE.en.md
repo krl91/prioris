@@ -33,11 +33,31 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
-The macOS `llama-simple` runtime is ad-hoc signed in the release.
-`install_unix.sh` and `run_unix.sh` also remove the macOS quarantine attribute
-from the whole extracted folder, and the local LLM provider repeats that cleanup
-just before calling the binary. This is not full Apple Developer notarization,
-but it avoids the common Gatekeeper block on the downloaded archive.
+The macOS `llama-simple` runtime is ad-hoc signed with Hardened Runtime in the
+release. `install_unix.sh` and `run_unix.sh` also remove the macOS quarantine
+attribute from the whole extracted folder, and the local LLM provider repeats
+that cleanup just before calling the binary. This is not full Apple Developer
+notarization, but it avoids the common Gatekeeper block on the downloaded
+archive.
+
+> **If macOS blocks `llama-simple` with "Apple could not verify…"**
+> (Gatekeeper dialog on first launch): this is expected for a binary downloaded
+> without paid Apple notarization. Two ways to allow it:
+>
+> **Option A – included script (runtime zip only)**
+> ```bash
+> chmod +x allow-macos.sh && ./allow-macos.sh
+> ```
+> This script removes the quarantine attribute from the whole directory.
+>
+> **Option B – via the full app bundle (recommended)**
+> Run `./scripts/install_unix.sh`: the script automatically strips quarantine
+> from the entire extracted folder.
+>
+> **Option C – manually**
+> ```bash
+> xattr -dr com.apple.quarantine /path/to/prioris-macos-arm64
+> ```
 
 Linux x64:
 

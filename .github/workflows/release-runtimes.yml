@@ -203,8 +203,24 @@ jobs:
           cp build/bin/llama-simple runtime/macos-arm64/
           find build/bin -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec cp -P {} runtime/macos-arm64/ \;
           ! find runtime/macos-arm64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
-          find runtime/macos-arm64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --force --sign - --timestamp=none {} \;
+          # Sign the main executable with Hardened Runtime so macOS Gatekeeper
+          # treats it as "unidentified developer" (bypassable) rather than
+          # "potential malware" (not bypassable) on macOS 14+ Sonoma / 15+ Sequoia.
+          codesign --force --sign - --options runtime --timestamp=none runtime/macos-arm64/llama-simple
+          find runtime/macos-arm64 -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec codesign --force --sign - --timestamp=none {} \;
           codesign --verify --verbose runtime/macos-arm64/llama-simple
+          # Helper script so users who download only the runtime zip can bypass
+          # Gatekeeper with a single command instead of going through System Settings.
+          cat > runtime/macos-arm64/allow-macos.sh << 'ALLOW_EOF'
+          #!/bin/sh
+          # Run once after downloading to let macOS execute llama-simple.
+          # Removes the quarantine attribute macOS sets on downloaded files.
+          #
+          # Usage:  chmod +x allow-macos.sh && ./allow-macos.sh
+          xattr -dr com.apple.quarantine "$(dirname "$0")"
+          echo "Done – llama-simple is now allowed to run."
+          ALLOW_EOF
+          chmod +x runtime/macos-arm64/allow-macos.sh
           (cd runtime && zip -r ../runtime-macos-arm64.zip macos-arm64)
 
       - name: Upload workflow artifact

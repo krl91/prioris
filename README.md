@@ -82,7 +82,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             191 tests automatisés
+tests/             202 tests automatisés
 ```
 
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
@@ -154,7 +154,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `191 passed`.
+Résultat attendu dans un clone complet du dépôt source : `202 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -234,8 +234,23 @@ actif, tu peux répondre en texte libre à toutes les questions à choix :
 PRIORIS interprète la réponse, propose l'option comprise, puis attend ta
 confirmation. Si le LLM est KO/offline, l'interface repasse aux boutons. La
 réponse à « Instinctivement, tu la classes comment ? » ne force pas le score :
-elle déclenche des questions de challenge anti-biais pour vérifier urgence
-réelle, pression sociale, manque d'information ou importance sous-estimée.
+elle prépare des questions de challenge anti-biais. Elles sont posées une par
+une après les questions factuelles, juste avant le calcul. Chaque réponse peut
+proposer une correction d'axe, expliquée puis confirmée avant d'entrer dans le
+calcul.
+
+### Calcul et planification
+
+- Une question affichée attend toujours une réponse. Une réponse LLM non
+  confirmée n'est jamais utilisée.
+- Le quadrant est calculé sans LLM : urgence `U = 30% BLK + 40% CDR + 30% HOR`,
+  importance `I = 35% IMP + 25% INA + 20% IRR + 20% ALN`, puis `G = 60% I +
+  40% U`.
+- Seuils : urgent si `U >= 55`, important si `I >= 50`. `Q1 -> P1`, `Q2 -> P2`,
+  `Q3 -> P3`, `Q4 -> P4`.
+- Le plan du jour prend les P1 d'abord, puis P2/P3 selon
+  `score global + bonus échéance + bonus pépite + ajustement énergie`. Les P4
+  et les estimations inconnues ne sont jamais planifiées.
 
 ### Telegram
 
@@ -278,7 +293,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-191 tests passent localement. Les améliorations restantes envisagées sont :
+202 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

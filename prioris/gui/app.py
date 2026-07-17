@@ -215,7 +215,6 @@ class InterviewDialog(tk.Toplevel):
         self.interview_id = db.create_interview(conn, self.task_id, session.mode)
         self.session = session
         self._goal_id: int | None = None
-        self._quadrant_helpers_shown = False
         self._challenge_questions: list[str] = []
         self._challenge_index = 0
         self._challenge_subjective = ""
@@ -280,14 +279,16 @@ class InterviewDialog(tk.Toplevel):
             w.destroy()
 
     def _show_next(self) -> None:
-        if self._challenge_index < len(self._challenge_questions):
-            self._show_challenge_question()
-            return
         q, self.session = itv.next_question(self.session)
         self._clear_buttons()
         self._status_var.set(f"Mode : {self.session.mode}")
 
         if q is None:
+            # Challenge only after factual answers, so a later standard answer
+            # cannot overwrite a correction explicitly confirmed by the user.
+            if self._challenge_index < len(self._challenge_questions):
+                self._show_challenge_question()
+                return
             self._finish()
             return
 
@@ -304,8 +305,6 @@ class InterviewDialog(tk.Toplevel):
             return
 
         # Standard question: text and buttons.
-        if q == Q.SUBJECTIVE:
-            self._show_quadrant_helpers()
         self._q_var.set(question_text(q, self.language))
         if self.llm and self.llm.available:
             self._show_text_answer(q)
@@ -315,26 +314,8 @@ class InterviewDialog(tk.Toplevel):
                 command=lambda v=val, qq=q: self._on_answer(qq, v),
             ).pack(fill="x", pady=2, padx=4)
 
-    def _show_quadrant_helpers(self) -> None:
-        """Display LLM-generated quadrant helper questions once."""
-        if self._quadrant_helpers_shown or not self.llm or not self.llm.available:
-            return
-        self._quadrant_helpers_shown = True
-        self.config(cursor="watch")
-        self.update_idletasks()
-        questions = self.llm.quadrant_questions(self.task_title, self.language)
-        self.config(cursor="")
-        if not questions:
-            return
-        box = ttk.LabelFrame(self._btn_frame,
-                             text=t("quadrant_helper_title", self.language))
-        box.pack(fill="x", pady=(2, 8), padx=4)
-        for i, question in enumerate(questions, start=1):
-            ttk.Label(box, text=f"{i}. {question}", wraplength=470,
-                      justify="left").pack(fill="x", padx=6, pady=2)
-
     def _start_subjective_challenge(self, subjective: str) -> bool:
-        """Insert LLM challenge questions into the interview flow."""
+        """Prepare LLM challenge questions for the end of the interview."""
         if not self.llm or not self.llm.available:
             return False
         self.config(cursor="watch")

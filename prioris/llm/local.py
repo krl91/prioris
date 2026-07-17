@@ -284,22 +284,6 @@ def _task_impact(payload: dict) -> dict:
     }
 
 
-def _quadrant_questions(payload: dict) -> dict:
-    title = payload.get("tache", "").strip() or "cette tâche"
-    lang = payload.get("langue", "français")
-    if lang == "anglais":
-        return {"questions": [
-            f"What concrete problem appears if '{title}' is not done today or this week?",
-            f"Who benefits or is blocked if '{title}' is completed versus postponed?",
-            f"Is there a real deadline or cost of delay for '{title}', or only pressure?",
-        ]}
-    return {"questions": [
-        f"Quel problème concret apparaît si « {title} » n'est pas fait aujourd'hui ou cette semaine ?",
-        f"Qui bénéficie ou reste bloqué si « {title} » est fait plutôt que reporté ?",
-        f"Y a-t-il une vraie échéance ou un coût du retard pour « {title} », ou seulement de la pression ?",
-    ]}
-
-
 def _subjective_challenge(payload: dict) -> dict:
     title = payload.get("tache", "").strip() or "cette tâche"
     subjective = payload.get("classement_instinctif", "")
@@ -368,8 +352,6 @@ def chat(system: str, user: str) -> str:
         return json.dumps(_task_revision(payload), ensure_ascii=False)
     if system == prompts.TASK_IMPACT_SYSTEM:
         return json.dumps(_task_impact(payload), ensure_ascii=False)
-    if system == prompts.QUADRANT_QUESTIONS_SYSTEM:
-        return json.dumps(_quadrant_questions(payload), ensure_ascii=False)
     if system == prompts.SUBJECTIVE_CHALLENGE_SYSTEM:
         return json.dumps(_subjective_challenge(payload), ensure_ascii=False)
     if system == prompts.CHALLENGE_ANSWER_SYSTEM:

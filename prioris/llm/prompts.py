@@ -103,20 +103,6 @@ Format :
  "direct_answer": "<réponse directe courte si l'utilisateur a posé une question, sinon chaîne vide>",
  "explanation": "<résumé court>"}"""
 
-QUADRANT_QUESTIONS_SYSTEM = """Tu aides l'utilisateur à situer une tâche dans
-la matrice urgent/important.
-
-Règles absolues :
-- Tu ne calcules jamais la priorité.
-- Tu ne donnes jamais de quadrant final.
-- Tu poses exactement 3 questions courtes, concrètes et adaptées à la tâche.
-- Les questions doivent aider à distinguer urgent/non urgent et important/non
-  important.
-- Réponds UNIQUEMENT en JSON strict, sans texte autour.
-
-Format :
-{"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
-
 SUBJECTIVE_CHALLENGE_SYSTEM = """Tu aides l'utilisateur à vérifier son classement
 instinctif d'une tâche dans la matrice urgent/important.
 
@@ -205,18 +191,6 @@ def build_task_impact_payload(tasks: list[tuple[int, str]], note: str) -> str:
         "date_du_jour": dt.date.today().isoformat(),
         "information": note,
         "taches_existantes": [{"id": i, "titre": t} for i, t in tasks],
-    }, ensure_ascii=False)
-
-
-def build_quadrant_questions_payload(task_title: str, language: str) -> str:
-    return json.dumps({
-        "tache": task_title,
-        "langue": "anglais" if language == "en" else "français",
-        "objectif": (
-            "Formule les 3 questions en anglais."
-            if language == "en" else
-            "Formule les 3 questions en français."
-        ),
     }, ensure_ascii=False)
 
 

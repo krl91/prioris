@@ -109,33 +109,9 @@ def _keyboard(q: Q, language: str = "fr") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-async def _send_quadrant_helpers(message, context, state: dict) -> None:
-    """Show LLM-generated quadrant helper questions once per interview."""
-    if state.get("quadrant_helpers_shown"):
-        return
-    llm = context.bot_data.get("llm")
-    if not llm or not llm.available:
-        return
-    if not await _ensure_llm_ready(message, context):
-        return
-    task = state["conn"].execute(
-        "SELECT titre FROM tasks WHERE id=?", (state["task_id"],)).fetchone()
-    questions = await asyncio.to_thread(
-        llm.quadrant_questions,
-        task["titre"] if task else "",
-        _language(context),
-    )
-    state["quadrant_helpers_shown"] = True
-    if not questions:
-        return
-    lines = [t("quadrant_helper_title", _language(context))]
-    lines += [f"{i}. {question}" for i, question in enumerate(questions, start=1)]
-    await message.reply_text("\n".join(lines))
-
-
 async def _send_subjective_challenge(message, context, state: dict,
                                      subjective: str) -> bool:
-    """Insert LLM challenge questions after the instinctive classification."""
+    """Prepare LLM challenge questions for the end of the interview."""
     if state.get("subjective_challenge_shown"):
         return False
     llm = context.bot_data.get("llm")
@@ -157,8 +133,7 @@ async def _send_subjective_challenge(message, context, state: dict,
     state["challenge_questions"] = questions
     state["challenge_index"] = 0
     state["challenge_subjective"] = subjective
-    await _ask_challenge_question(message, context, state)
-    return True
+    return False
 
 
 async def _ask_challenge_question(message, context, state: dict) -> None:
@@ -253,6 +228,12 @@ async def _ask_next(message, chat_id: int, context) -> None:
     state["session"] = session
     state["current_q"] = q          # pour router les réponses libres (NLU)
     if q is None:
+        # Ask challenges only after factual answers and the mirror probe. This
+        # prevents a later standard answer from overwriting a confirmed update.
+        questions = state.get("challenge_questions") or []
+        if state.get("challenge_index", 0) < len(questions):
+            await _ask_challenge_question(message, context, state)
+            return
         await _finish_interview(message, chat_id, context)
         return
     if q == Q.CLARIFICATION:
@@ -299,7 +280,6 @@ async def _ask_next(message, chat_id: int, context) -> None:
             return
     if q == Q.SUBJECTIVE:
         # Visual reminder of quadrants when asking for instinctive priority.
-        await _send_quadrant_helpers(message, context, state)
         lang = _language(context)
         try:
             png = resources.files("prioris.bot").joinpath(

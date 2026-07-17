@@ -90,10 +90,10 @@ def test_final_axes_defauts_express():
     assert Axis.INA not in par_defaut    # répondu, pas défaut
 
 
-def test_probe_challenge_corrige_un_axe_pour_le_calcul_final():
-    s = Session()
-    s = itv.answer(s, Q.SUBJECTIVE, "P1")
-    s = itv.answer(s, Q.INACTION, 1)
+def test_probe_challenge_final_corrige_un_axe_sans_etre_ecrase():
+    """A challenge correction occurs after the factual interview."""
+    _, s = run_until(Session(), EXPRESS_ANSWERS)
+    assert s.axes[Axis.CDR] == 1
     s = itv.set_axis_probe(s, "CDR", 3)
     axes, par_defaut = itv.final_axes(s)
     assert axes[Axis.CDR] == 3

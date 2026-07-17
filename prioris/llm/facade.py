@@ -325,40 +325,6 @@ class LLMFacade:
             return result
         return None
 
-    def quadrant_questions(self, task_title: str,
-                           language: str = "fr") -> list[str] | None:
-        """Generate three task-specific questions to help locate the quadrant."""
-        if not self.available:
-            self.last_error = "LLM désactivé (enabled = false ou section absente)"
-            return None
-        lang = "en" if language == "en" else "fr"
-        payload = prompts.build_quadrant_questions_payload(task_title, lang)
-        model = self._client.cfg.model
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            t0 = time.monotonic()
-            try:
-                raw = self._client.chat(prompts.QUADRANT_QUESTIONS_SYSTEM, payload)
-                data = _extract_json(raw)
-                questions = data.get("questions")
-                if not isinstance(questions, list) or len(questions) != 3:
-                    raise ValueError("questions doit contenir exactement 3 éléments")
-                clean = []
-                for question in questions:
-                    text = str(question).strip()
-                    if not text or len(text) > 180:
-                        raise ValueError(f"question invalide : {question!r}")
-                    clean.append(text)
-            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
-                self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
-                self._log("quadrant_questions", model,
-                          int((time.monotonic() - t0) * 1000), False)
-                continue
-            self.last_error = None
-            self._log("quadrant_questions", model,
-                      int((time.monotonic() - t0) * 1000), True)
-            return clean
-        return None
-
     def subjective_challenge_questions(
         self,
         task_title: str,

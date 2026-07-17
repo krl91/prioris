@@ -122,7 +122,6 @@ UI_TEXT: dict[Language, dict[str, str]] = {
         "colleague": "Collègue",
         "manager": "Manager",
         "client": "Client",
-        "quadrant_helper_title": "Questions pour situer le quadrant :",
     },
     "en": {
         "subjective": "Instinctively, how would you classify it?",
@@ -140,7 +139,6 @@ UI_TEXT: dict[Language, dict[str, str]] = {
         "colleague": "Colleague",
         "manager": "Manager",
         "client": "Client",
-        "quadrant_helper_title": "Questions to locate the quadrant:",
     },
 }
 

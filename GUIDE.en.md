@@ -242,7 +242,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `191 passed`.
+Expected result: `202 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +261,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `191 passed`.
+Expected result: `202 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -351,11 +351,10 @@ in English. French remains the default. Scoring and confirmations are unchanged.
 When an LLM is available, free-text answers are accepted for every
 choice-based question. PRIORIS interprets the answer, proposes the understood
 option, then waits for confirmation. If the LLM is down/offline, the UI falls
-back to buttons. PRIORIS also asks 3 task-specific helper questions before the
-instinctive quadrant question; after the instinctive P1/P2/P3/P4 answer is
-confirmed, it asks 3 challenge questions to check real urgency, social pressure,
-missing facts or underestimated importance. These questions never change the
-score automatically.
+back to buttons. After the instinctive P1/P2/P3/P4 answer is confirmed,
+PRIORIS prepares 3 challenge questions. It finishes the factual interview,
+then asks them one at a time just before scoring. Each answer may propose an
+axis correction, and nothing enters the calculation without confirmation.
 
 ## 6. Core Workflow
 
@@ -368,7 +367,37 @@ score automatically.
 7. Use `/today` or the GUI daily-plan button to build a realistic plan.
 
 The interview can switch from express to full mode when the facts justify it:
-strong subjective urgency, severe inaction, nearby deadline or contradiction.
+strong subjective urgency, severe inaction, a nearby deadline or a
+contradiction.
+
+### How LLM Answers Affect The Quadrant
+
+PRIORIS follows a strict rule: **one displayed question = one expected answer**.
+LLM-generated text affects the score only through this confirmed flow:
+
+1. PRIORIS finishes the factual questions, then asks one challenge.
+2. You answer.
+3. The LLM interprets the answer as a candidate axis/value update:
+   `CDR` cost of delay, `INA` consequence of doing nothing, `BLK` blockage,
+   `IMP` impact, `HOR` time horizon, `IRR` irreversibility, `ALN` life goal.
+4. PRIORIS explains the proposed correction.
+5. You accept or reject it.
+6. Only accepted corrections update the interview session.
+
+The final calculation is deterministic and does not call the LLM:
+
+- urgency `U` = `30% BLK + 40% CDR + 30% HOR`
+- importance `I` = `35% IMP + 25% INA + 20% IRR + 20% ALN`
+- global score `G` = `60% I + 40% U`
+- urgent threshold: `U >= 55`
+- important threshold: `I >= 50`
+- quadrant: `Q1` if urgent and important, `Q2` if important only, `Q3` if
+  urgent only, `Q4` otherwise
+- priority: `Q1 -> P1`, `Q2 -> P2`, `Q3 -> P3`, `Q4 -> P4`
+
+The daily plan then considers P1 first, fills remaining capacity with P2/P3,
+never schedules P4 or unknown estimates, and ranks candidates by
+`global score + gem bonus + deadline bonus + energy adjustment`.
 
 ## 6. `/info`
 
@@ -443,7 +472,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 190 passing automated tests.
+- 202 passing automated tests.
 
 Still possible future work:
 

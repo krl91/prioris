@@ -538,44 +538,6 @@ def test_impact_taches_ignore_id_null_et_propose_nouvelle_tache():
     assert "pomme" in result["new_task_title"]
 
 
-def test_quadrant_questions_valide_et_journalise():
-    calls = []
-    raw = json.dumps({
-        "questions": [
-            "What happens if this waits until next week?",
-            "Who is blocked or helped by this task?",
-            "Is there a real deadline or only pressure?",
-        ],
-    })
-    f = LLMFacade(
-        ChatClient(LLMConfig(enabled=True, provider="ollama", model="m"),
-                   fake_transport(raw)),
-        log_fn=lambda t, m, ms, ok: calls.append((t, m, ok)),
-    )
-    questions = f.quadrant_questions("Prepare client reply", "en")
-    assert questions == [
-        "What happens if this waits until next week?",
-        "Who is blocked or helped by this task?",
-        "Is there a real deadline or only pressure?",
-    ]
-    assert calls == [("quadrant_questions", "m", True)]
-
-
-def test_quadrant_questions_exige_exactement_trois_questions():
-    assert facade_with(json.dumps({"questions": ["Une seule ?"]})).quadrant_questions(
-        "Tâche") is None
-
-
-def test_quadrant_questions_prioris_local_en_anglais():
-    cfg = LLMConfig(enabled=True, provider="prioris", model="rules-v1")
-    f = LLMFacade(ChatClient(cfg))
-    questions = f.quadrant_questions("Prepare client reply", "en")
-    assert questions is not None
-    assert len(questions) == 3
-    assert all("?" in q for q in questions)
-    assert "What concrete problem" in questions[0]
-
-
 def test_subjective_challenge_questions_valide_et_journalise():
     calls = []
     raw = json.dumps({

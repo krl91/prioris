@@ -78,7 +78,7 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             191 automated tests
+tests/             202 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
@@ -149,7 +149,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `191 passed`.
+Expected result in a full source repository clone: `202 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -225,9 +225,23 @@ Scoring, priorities and confirmations stay identical. When an LLM is active,
 you can answer every choice-based question in free text: PRIORIS interprets the
 answer, proposes the understood option, then waits for your confirmation. If the
 LLM is down/offline, the UI falls back to buttons. The answer to “Instinctively,
-how would you classify it?” does not force the score: it triggers anti-bias
-challenge questions to check real urgency, social pressure, missing facts, or
-underestimated importance.
+how would you classify it?” does not force the score: it prepares anti-bias
+challenge questions. They are asked one at a time after the factual questions,
+just before scoring. Each answer may propose an axis correction, which is
+explained and confirmed before it can affect the calculation.
+
+### Calculation And Planning
+
+- One displayed question always expects one answer. An unconfirmed LLM
+  interpretation is never used.
+- The quadrant is calculated without the LLM: urgency `U = 30% BLK + 40% CDR +
+  30% HOR`, importance `I = 35% IMP + 25% INA + 20% IRR + 20% ALN`, then `G =
+  60% I + 40% U`.
+- Thresholds: urgent if `U >= 55`, important if `I >= 50`. `Q1 -> P1`, `Q2 ->
+  P2`, `Q3 -> P3`, `Q4 -> P4`.
+- The daily plan considers P1 first, then P2/P3 by `global score + deadline
+  bonus + gem bonus + energy adjustment`. P4 tasks and unknown estimates are
+  never scheduled.
 
 ### Telegram
 
@@ -270,7 +284,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-191 tests pass locally. Remaining possible improvements: advanced scenario
+202 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

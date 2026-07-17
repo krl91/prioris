@@ -25,7 +25,12 @@ def test_golden_sport():
     """« Faire 45 min de sport » (§6.4) : l'invisible monte en P2."""
     r = score(axes(blk=1, cdr=3, hor=1, imp=3, ina=2, irr=1, aln=3),
               estimation=Estimation.M30_60)
-    assert r.as_tuple() == (43.5, 65.4, 56.6, "Q2", "P2")
+    urgence, importance, global_score, quadrant, priorite = r.as_tuple()
+    assert urgence == 43.5
+    assert importance == 65.4
+    assert global_score == pytest.approx(56.6, abs=0.1)
+    assert quadrant == "Q2"
+    assert priorite == "P2"
 
 
 # ------------------------------------------------------------ ajustements

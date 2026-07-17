@@ -196,6 +196,20 @@ def set_deadline(s: Session, deadline_days: int) -> Session:
     return _check_contradictions(s)
 
 
+def set_axis_probe(s: Session, axis_code: str, value: int,
+                   incertain: bool = False) -> Session:
+    """Apply an LLM-interpreted probe answer as an axis update."""
+    axis = Axis(axis_code)
+    axes = dict(s.axes)
+    axes[axis] = int(value)
+    kw: dict = {"axes": axes}
+    if incertain:
+        incs = dict(s.incertitudes)
+        incs[axis] = Incertitude.NE_SAIT_PAS
+        kw["incertitudes"] = incs
+    return _check_contradictions(replace(s, **kw))
+
+
 def _check_contradictions(s: Session) -> Session:
     if s.clarifications >= MAX_CLARIFICATIONS:
         return s  # cap reached: evaluation remains provisional

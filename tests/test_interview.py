@@ -90,6 +90,16 @@ def test_final_axes_defauts_express():
     assert Axis.INA not in par_defaut    # répondu, pas défaut
 
 
+def test_probe_challenge_corrige_un_axe_pour_le_calcul_final():
+    s = Session()
+    s = itv.answer(s, Q.SUBJECTIVE, "P1")
+    s = itv.answer(s, Q.INACTION, 1)
+    s = itv.set_axis_probe(s, "CDR", 3)
+    axes, par_defaut = itv.final_axes(s)
+    assert axes[Axis.CDR] == 3
+    assert Axis.CDR not in par_defaut
+
+
 def test_clarification_je_ne_sais_pas_marque_incertitude():
     """Audit v0.3.5 : « je ne sais pas » en clarification = incertitude
     enregistrée ⇒ évaluation provisoire, comme le 🤷 des questions normales."""

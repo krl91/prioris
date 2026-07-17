@@ -48,6 +48,23 @@ def test_v_task_current_prend_la_derniere():
     assert len(rows) == 1 and rows[0]["priorite"] == r2.priorite.value
 
 
+def test_create_custom_category_and_use_it_for_task():
+    conn = db.connect(":memory:")
+    code = db.create_category(conn, "Administratif maison")
+    assert code == "administratif_maison"
+    assert db.create_category(conn, "Administratif maison") == code
+
+    task_id = db.create_task(conn, "Ranger les papiers", code)
+    row = conn.execute(
+        "SELECT c.code, c.label FROM tasks t "
+        "LEFT JOIN categories c ON c.id=t.category_id WHERE t.id=?",
+        (task_id,),
+    ).fetchone()
+    assert row["code"] == "administratif_maison"
+    assert row["label"] == "Administratif maison"
+    assert any(cat["code"] == code for cat in db.list_categories(conn))
+
+
 def test_export_plan_note(tmp_path):
     tasks = [PlanTask(1, "Sport 45 min", Priorite.P2, 56.6, 45,
                       Effort.FAIBLE, "sante", False)]

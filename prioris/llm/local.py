@@ -317,6 +317,38 @@ def _subjective_challenge(payload: dict) -> dict:
     ]}
 
 
+def _challenge_answer(payload: dict) -> dict:
+    text = _norm(payload.get("reponse_utilisateur", ""))
+    if any(word in text for word in ("deadline", "echeance", "échéance", "retard", "ce soir",
+                                     "demain", "aujourd hui", "aujourd'hui")):
+        return {
+            "axis": "CDR",
+            "value": 3,
+            "uncertainty": 0,
+            "reason": "La réponse mentionne une échéance ou un coût du retard.",
+        }
+    if any(word in text for word in ("bloque", "bloqué", "attend", "depend", "dépend")):
+        return {
+            "axis": "BLK",
+            "value": 4,
+            "uncertainty": 0,
+            "reason": "La réponse indique un blocage concret.",
+        }
+    if any(word in text for word in ("impact", "important", "benefice", "bénéfice", "objectif")):
+        return {
+            "axis": "IMP",
+            "value": 2,
+            "uncertainty": 1,
+            "reason": "La réponse indique un impact mais reste peu quantifiée.",
+        }
+    return {
+        "axis": None,
+        "value": 0,
+        "uncertainty": 1,
+        "reason": "La réponse ne contient pas de fait exploitable pour corriger un axe.",
+    }
+
+
 def chat(system: str, user: str) -> str:
     """Return a JSON response compatible with ChatClient.chat."""
     if '"ping": true' in user:
@@ -340,4 +372,6 @@ def chat(system: str, user: str) -> str:
         return json.dumps(_quadrant_questions(payload), ensure_ascii=False)
     if system == prompts.SUBJECTIVE_CHALLENGE_SYSTEM:
         return json.dumps(_subjective_challenge(payload), ensure_ascii=False)
+    if system == prompts.CHALLENGE_ANSWER_SYSTEM:
+        return json.dumps(_challenge_answer(payload), ensure_ascii=False)
     return "{}"

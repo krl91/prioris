@@ -134,6 +134,28 @@ Règles absolues :
 Format :
 {"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
 
+CHALLENGE_ANSWER_SYSTEM = """Tu interprètes une réponse utilisateur à une
+question de vérification de quadrant urgent/important.
+
+Règles absolues :
+- Tu ne calcules jamais la priorité finale.
+- Tu proposes au plus une correction d'axe.
+- Tu ne modifies rien si la réponse ne contient pas de fait concret.
+- Tu privilégies :
+  CDR pour vraie date limite ou coût du retard,
+  INA pour conséquence de ne rien faire,
+  BLK pour blocage de personnes/systèmes,
+  IMP pour impact/bénéfice,
+  HOR pour horizon temporel,
+  IRR pour irréversibilité,
+  ALN pour objectif de vie.
+- valeur doit être un entier entre 0 et valeur_max.
+- incertitude vaut 0, 1 ou 2.
+- Réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"axis": "CDR|INA|BLK|IMP|HOR|IRR|ALN|null", "value": 0, "uncertainty": 0, "reason": "<raison courte>"}"""
+
 
 def build_goal_match_payload(task_title: str,
                              goals: list[tuple[int, str]]) -> str:
@@ -209,4 +231,19 @@ def build_subjective_challenge_payload(task_title: str, subjective: str,
             if language == "en" else
             "Formule les 3 questions en français."
         ),
+    }, ensure_ascii=False)
+
+
+def build_challenge_answer_payload(task_title: str, subjective: str,
+                                   question: str, user_text: str,
+                                   current_axes: dict,
+                                   language: str) -> str:
+    return json.dumps({
+        "tache": task_title,
+        "classement_instinctif": subjective,
+        "question_posee": question,
+        "reponse_utilisateur": user_text,
+        "axes_actuels": current_axes,
+        "valeurs_max": {axis.value: AXIS_MAX[axis] for axis in Axis},
+        "langue": "anglais" if language == "en" else "français",
     }, ensure_ascii=False)

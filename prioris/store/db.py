@@ -10,10 +10,20 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import unicodedata
 from importlib import resources
 from pathlib import Path
 
 _WRITE_LOCK = threading.Lock()
+
+
+def _category_code(label: str) -> str:
+    normalized = unicodedata.normalize("NFKD", label.strip().lower())
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    code = "".join(ch if ch.isalnum() else "_" for ch in ascii_text)
+    while "__" in code:
+        code = code.replace("__", "_")
+    return code.strip("_")
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -76,6 +86,39 @@ def current_tasks(conn) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM v_task_current WHERE statut IN ('evaluee','planifiee') "
         "ORDER BY priorite, score_global DESC").fetchall()
+
+
+# ------------------------------------------------------------ categories
+def list_categories(conn) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT code, label FROM categories ORDER BY id"
+    ).fetchall()
+
+
+def create_category(conn, label: str) -> str:
+    clean_label = " ".join(label.strip().split())
+    if not clean_label:
+        raise ValueError("empty category label")
+    code = _category_code(clean_label)
+    if not code:
+        raise ValueError("invalid category label")
+    with _WRITE_LOCK:
+        suffix = 2
+        candidate = code
+        while conn.execute("SELECT 1 FROM categories WHERE code=?",
+                           (candidate,)).fetchone():
+            existing = conn.execute(
+                "SELECT label FROM categories WHERE code=?",
+                (candidate,),
+            ).fetchone()
+            if existing and existing["label"].lower() == clean_label.lower():
+                return candidate
+            candidate = f"{code}_{suffix}"
+            suffix += 1
+        conn.execute("INSERT INTO categories (code, label) VALUES (?,?)",
+                     (candidate, clean_label))
+        conn.commit()
+        return candidate
 
 
 # ------------------------------------------------------------ goals

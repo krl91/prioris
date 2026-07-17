@@ -37,7 +37,14 @@ CATEGORIES = [
 
 
 def _category_label(cat: str) -> str:
-    return "IA" if cat == "ia" else cat.capitalize()
+    return "IA" if cat == "ia" else cat.replace("_", " ").capitalize()
+
+
+def _category_choices(conn=None) -> list[tuple[str, str]]:
+    if conn is None:
+        return [(cat, _category_label(cat)) for cat in CATEGORIES]
+    rows = db.list_categories(conn)
+    return [(row["code"], row["label"]) for row in rows]
 
 
 def _parse_task_ids(raw: str | None) -> list[int] | None:
@@ -99,7 +106,7 @@ def _why_text(conn, task_id: int) -> str:
 
 # ─────────────────────────────────────────── category picker dialog
 
-def _pick_category(parent: tk.BaseWidget) -> str | None:
+def _pick_category(parent: tk.BaseWidget, conn=None) -> str | None:
     """Modal category picker. Returns None when cancelled."""
     dlg = tk.Toplevel(parent)
     dlg.title("Catégorie")
@@ -115,15 +122,33 @@ def _pick_category(parent: tk.BaseWidget) -> str | None:
     frame = ttk.Frame(dlg, padding=4)
     frame.pack()
 
-    for i, cat in enumerate(CATEGORIES):
+    choices = _category_choices(conn)
+    for i, (cat, label) in enumerate(choices):
         def _click(c: str = cat) -> None:
             result[0] = c
             dlg.destroy()
 
-        ttk.Button(frame, text=_category_label(cat), width=10,
+        ttk.Button(frame, text=label, width=14,
                    command=_click).grid(row=i // 3, column=i % 3,
                                         padx=3, pady=3)
 
+    def _add_category() -> None:
+        label = simpledialog.askstring(
+            "Nouvelle catégorie",
+            "Nom de la nouvelle catégorie :",
+            parent=dlg,
+        )
+        if not label:
+            return
+        try:
+            result[0] = db.create_category(conn, label) if conn else label.strip().lower()
+        except ValueError as exc:
+            messagebox.showerror("Catégorie invalide", str(exc), parent=dlg)
+            return
+        dlg.destroy()
+
+    ttk.Button(dlg, text="+ Ajouter une catégorie",
+               command=_add_category).pack(pady=(8, 2))
     ttk.Button(dlg, text="Annuler",
                command=dlg.destroy).pack(pady=(4, 8))
 
@@ -191,6 +216,9 @@ class InterviewDialog(tk.Toplevel):
         self.session = session
         self._goal_id: int | None = None
         self._quadrant_helpers_shown = False
+        self._challenge_questions: list[str] = []
+        self._challenge_index = 0
+        self._challenge_subjective = ""
 
         self.title(f"Entretien — {titre[:55]}")
         self.geometry("520x460")
@@ -252,6 +280,9 @@ class InterviewDialog(tk.Toplevel):
             w.destroy()
 
     def _show_next(self) -> None:
+        if self._challenge_index < len(self._challenge_questions):
+            self._show_challenge_question()
+            return
         q, self.session = itv.next_question(self.session)
         self._clear_buttons()
         self._status_var.set(f"Mode : {self.session.mode}")
@@ -302,21 +333,114 @@ class InterviewDialog(tk.Toplevel):
             ttk.Label(box, text=f"{i}. {question}", wraplength=470,
                       justify="left").pack(fill="x", padx=6, pady=2)
 
-    def _show_subjective_challenge(self, subjective: str) -> None:
-        """Display LLM challenge questions after the instinctive answer."""
+    def _start_subjective_challenge(self, subjective: str) -> bool:
+        """Insert LLM challenge questions into the interview flow."""
         if not self.llm or not self.llm.available:
-            return
+            return False
         self.config(cursor="watch")
         self.update_idletasks()
         questions = self.llm.subjective_challenge_questions(
             self.task_title, subjective, self.language)
         self.config(cursor="")
         if not questions:
-            return
-        text = "Questions pour challenger ton instinct :\n" + "\n".join(
-            f"{i}. {question}" for i, question in enumerate(questions, start=1)
+            return False
+        self._challenge_questions = questions
+        self._challenge_index = 0
+        self._challenge_subjective = subjective
+        return True
+
+    def _show_challenge_question(self) -> None:
+        self._clear_buttons()
+        question = self._challenge_questions[self._challenge_index]
+        total = len(self._challenge_questions)
+        self._status_var.set(
+            f"Mode : {self.session.mode} · vérification {self._challenge_index + 1}/{total}")
+        self._q_var.set(
+            "Vérification de cohérence et biais\n\n"
+            f"{question}\n\n"
+            "Réponds librement : la réponse peut corriger un axe avant le calcul final.")
+        box = ttk.LabelFrame(self._btn_frame, text="Réponse libre (LLM)")
+        box.pack(fill="x", pady=(2, 8), padx=4)
+        var = tk.StringVar()
+        ttk.Entry(box, textvariable=var).pack(side="left", fill="x",
+                                              expand=True, padx=4, pady=4)
+        ttk.Button(
+            box, text="Valider",
+            command=lambda vv=var: self._submit_challenge_answer(vv.get()),
+        ).pack(side="right", padx=4, pady=4)
+        ttk.Button(
+            self._btn_frame, text="Passer cette question",
+            command=self._skip_challenge_question,
+        ).pack(fill="x", pady=2, padx=4)
+
+    def _skip_challenge_question(self) -> None:
+        question = self._challenge_questions[self._challenge_index]
+        db.record_answer(
+            self.conn, self.interview_id,
+            f"CHALLENGE_{self._challenge_index + 1}",
+            None, f"{question}\n\nRéponse ignorée.", 2,
         )
-        messagebox.showinfo("Challenge instinctif", text, parent=self)
+        self._challenge_index += 1
+        self._show_next()
+
+    def _submit_challenge_answer(self, text: str) -> None:
+        text = text.strip()
+        if not text:
+            messagebox.showwarning(
+                "Réponse vide",
+                "Réponds à la question ou utilise « Passer cette question ».",
+                parent=self,
+            )
+            return
+        question = self._challenge_questions[self._challenge_index]
+        self.config(cursor="watch")
+        self.update_idletasks()
+        current_axes, _defaults = itv.final_axes(self.session)
+        interpreted = self.llm.interpret_challenge_answer(
+            self.task_title,
+            self._challenge_subjective,
+            question,
+            text,
+            {axis.value: value for axis, value in current_axes.items()},
+            self.language,
+        ) if self.llm else None
+        self.config(cursor="")
+        if interpreted is None:
+            reason = getattr(self.llm, "last_error", None) if self.llm else "LLM absent"
+            messagebox.showwarning(
+                "Interprétation impossible",
+                "Je n'ai pas pu interpréter cette réponse.\n"
+                "Réessaie ou passe la question.\n\n"
+                f"Détail : {reason}",
+                parent=self,
+            )
+            return
+        axis = interpreted.get("axis")
+        value = interpreted.get("value")
+        reason = interpreted.get("reason") or "Aucune raison fournie."
+        uncertainty = int(interpreted.get("uncertainty") or 0)
+        if axis is not None:
+            ok = messagebox.askyesno(
+                "Confirmer la correction",
+                f"Réponse comprise : {reason}\n\n"
+                f"Proposition : axe {axis} = {value}\n\n"
+                "Appliquer cette correction au calcul du quadrant ?",
+                parent=self,
+            )
+            if not ok:
+                axis = None
+            else:
+                self.session = itv.set_axis_probe(
+                    self.session, axis, int(value), uncertainty >= 2)
+        db.record_answer(
+            self.conn, self.interview_id,
+            f"CHALLENGE_{self._challenge_index + 1}_{axis or 'NONE'}",
+            int(value) if axis is not None else None,
+            f"{question}\n\n{text}\n\n{reason}",
+            uncertainty,
+        )
+        self._challenge_index += 1
+        self._show_next()
 
     def _show_text_answer(self, q: Q) -> None:
         """Free-text LLM answer, always confirmed before recording."""
@@ -380,7 +504,7 @@ class InterviewDialog(tk.Toplevel):
         )
         self.session = itv.answer(self.session, q, value)
         if q == Q.SUBJECTIVE:
-            self._show_subjective_challenge(parsed.value)
+            self._start_subjective_challenge(parsed.value)
         self._show_next()
 
     # ── answer handling ──────────────────────────────────────────────
@@ -406,7 +530,7 @@ class InterviewDialog(tk.Toplevel):
             )
         self.session = itv.answer(self.session, q, value)
         if q == Q.SUBJECTIVE:
-            self._show_subjective_challenge(str(raw))
+            self._start_subjective_challenge(str(raw))
         self._show_next()
 
     @staticmethod
@@ -501,7 +625,7 @@ class InterviewDialog(tk.Toplevel):
                 parent=self,
             )
             return
-        cat = _pick_category(self)
+        cat = _pick_category(self, self.conn)
         if cat is None:
             return
         goal_id = db.create_goal(self.conn, titre, cat)
@@ -889,7 +1013,7 @@ class GoalsDialog(tk.Toplevel):
         titre = self._entry_var.get().strip()
         if not titre:
             return
-        cat = _pick_category(self)
+        cat = _pick_category(self, self.conn)
         if cat is None:
             return
         db.create_goal(self.conn, titre, cat)
@@ -1177,7 +1301,7 @@ class MainWindow(tk.Tk):
             return
         titre = titre.strip()
 
-        cat = _pick_category(self)
+        cat = _pick_category(self, self.conn)
         if cat is None:
             return
 
@@ -1433,7 +1557,7 @@ class MainWindow(tk.Tk):
     def _create_task_from_title(self, titre: str, suggested_deadline: str | None = None) -> None:
         if not titre.strip():
             return
-        cat = _pick_category(self)
+        cat = _pick_category(self, self.conn)
         if cat is None:
             return
         deadline_info = self._ask_deadline(suggested_deadline)
@@ -1630,7 +1754,7 @@ class MainWindow(tk.Tk):
 
         processed = 0
         for vt in fresh:
-            cat = _pick_category(self)
+            cat = _pick_category(self, self.conn)
             if cat is None:
                 break
             deadline_days = None

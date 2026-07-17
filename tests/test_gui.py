@@ -22,7 +22,8 @@ from prioris.core.axes import (AXIS_LABELS, ESTIMATION_MIN, Axis, Effort,
                                  Estimation, Incertitude, Priorite)
 from prioris.core.interview import Q, Session, answer, final_axes, next_question
 from prioris.core import scoring
-from prioris.gui.app import (CATEGORIES, QUESTION_TEXT, SyncPreviewDialog, _category_label,
+from prioris.gui.app import (CATEGORIES, QUESTION_TEXT, SyncPreviewDialog, _category_choices,
+                             _category_label,
                              _options, _parse_task_ids, _why_text)
 from prioris.i18n import normalize_language, options as i18n_options, question_text
 from prioris.store import db
@@ -155,6 +156,12 @@ def test_categories_contiennent_travail_et_perso():
 def test_categorie_ia_affichee_en_majuscules():
     assert _category_label("ia") == "IA"
     assert _category_label("travail") == "Travail"
+
+
+def test_categories_gui_lit_les_categories_personnalisees(tmp_path):
+    conn = db.connect(tmp_path / "prioris.db")
+    code = db.create_category(conn, "Maison")
+    assert (code, "Maison") in _category_choices(conn)
 
 
 def test_dialogue_sync_preview_existe():

@@ -1,4 +1,4 @@
-# PRIORIS v0.4.12
+# PRIORIS v0.4.13
 
 PRIORIS est un assistant personnel d'aide à la décision pour transformer une liste de tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian synchronisées.
 
@@ -6,6 +6,16 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 
 ## Nouveautés principales
 
+- **Questions anti-biais intégrées au calcul** : après le classement
+  instinctif, les 3 questions LLM sont maintenant posées une par une. Chaque
+  réponse est interprétée, proposée comme correction d'axe si pertinent, puis
+  confirmée avant d'entrer dans le calcul du quadrant.
+- **Double vérification de cohérence** : les réponses de challenge alimentent
+  le même moteur d'entretien que les autres réponses, puis la détection des
+  biais et la question miroir restent exécutées dans le flux normal.
+- **Catégories personnalisées persistantes** : en GUI et Telegram, il est
+  possible d'ajouter une catégorie si elle n'existe pas. Elle est enregistrée
+  en base et réapparaît aux prochains choix.
 - **Réponses libres LLM sur tout l'entretien** : en GUI et Telegram, quand le
   LLM est disponible, l'utilisateur peut répondre en texte libre à toutes les
   questions à choix. PRIORIS interprète, propose l'option comprise, puis demande

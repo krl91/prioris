@@ -34,7 +34,17 @@ CATEGORIES = ["travail", "carriere", "sante", "finances", "ia",
 
 
 def _category_label(cat: str) -> str:
-    return "IA" if cat == "ia" else cat.capitalize()
+    return "IA" if cat == "ia" else cat.replace("_", " ").capitalize()
+
+
+def _category_keyboard(conn, prefix: str = "cat",
+                       extra: str = "") -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(row["label"],
+                                  callback_data=f"{prefix}|{extra}{row['code']}")]
+            for row in db.list_categories(conn)]
+    rows.append([InlineKeyboardButton("➕ Ajouter une catégorie",
+                                      callback_data=f"catadd|{prefix}|{extra}")])
+    return InlineKeyboardMarkup(rows)
 
 
 def _deadline_days(deadline: str | None) -> int | None:
@@ -124,15 +134,15 @@ async def _send_quadrant_helpers(message, context, state: dict) -> None:
 
 
 async def _send_subjective_challenge(message, context, state: dict,
-                                     subjective: str) -> None:
-    """Ask LLM challenge questions after the instinctive classification."""
+                                     subjective: str) -> bool:
+    """Insert LLM challenge questions after the instinctive classification."""
     if state.get("subjective_challenge_shown"):
-        return
+        return False
     llm = context.bot_data.get("llm")
     if not llm or not llm.available:
-        return
+        return False
     if not await _ensure_llm_ready(message, context):
-        return
+        return False
     task = state["conn"].execute(
         "SELECT titre FROM tasks WHERE id=?", (state["task_id"],)).fetchone()
     questions = await asyncio.to_thread(
@@ -143,10 +153,29 @@ async def _send_subjective_challenge(message, context, state: dict,
     )
     state["subjective_challenge_shown"] = True
     if not questions:
+        return False
+    state["challenge_questions"] = questions
+    state["challenge_index"] = 0
+    state["challenge_subjective"] = subjective
+    await _ask_challenge_question(message, context, state)
+    return True
+
+
+async def _ask_challenge_question(message, context, state: dict) -> None:
+    questions = state.get("challenge_questions") or []
+    idx = state.get("challenge_index", 0)
+    if idx >= len(questions):
+        state.pop("challenge_questions", None)
+        state.pop("challenge_index", None)
+        state.pop("challenge_subjective", None)
+        await _ask_next(message, message.chat_id, context)
         return
-    lines = ["Questions pour challenger ton instinct :"]
-    lines += [f"{i}. {question}" for i, question in enumerate(questions, start=1)]
-    await message.reply_text("\n".join(lines))
+    state["awaiting_challenge_answer"] = True
+    await message.reply_text(
+        f"Vérification de cohérence et biais ({idx + 1}/{len(questions)})\n\n"
+        f"{questions[idx]}\n\n"
+        "Réponds librement. J'utiliserai ta réponse pour vérifier le quadrant "
+        "et je demanderai confirmation avant toute correction.")
 
 
 def _typed_answer_value(q: Q, raw: str):
@@ -342,10 +371,9 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Usage : /add <titre de la tâche>")
         return
     context.chat_data["pending_title"] = titre
-    rows = [[InlineKeyboardButton(_category_label(c), callback_data=f"cat|{c}")]
-            for c in CATEGORIES]
     await update.message.reply_text(f"Nouvelle tâche : « {titre} ». Catégorie ?",
-                                    reply_markup=InlineKeyboardMarkup(rows))
+                                    reply_markup=_category_keyboard(
+                                        context.bot_data["conn"], "cat"))
 
 
 async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -471,11 +499,9 @@ async def cmd_goals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     conn = context.bot_data["conn"]
     if context.args:
         context.chat_data["pending_goal"] = " ".join(context.args)
-        rows = [[InlineKeyboardButton(_category_label(c), callback_data=f"gcat|{c}")]
-                for c in CATEGORIES]
         await update.message.reply_text(
             f"Nouvel objectif : « {context.chat_data['pending_goal']} ». Catégorie ?",
-            reply_markup=InlineKeyboardMarkup(rows))
+            reply_markup=_category_keyboard(conn, "gcat"))
         return
     goals = db.active_goals(conn)
     if not goals:
@@ -552,13 +578,11 @@ async def _scan_next(message, context) -> None:
     vt = queue.pop(0)
     context.chat_data["scan_queue"] = queue
     context.chat_data["scan_current"] = vt
-    rows = [[InlineKeyboardButton(_category_label(c), callback_data=f"scat|{c}")]
-            for c in CATEGORIES]
     extra = f"\n📅 échéance : {vt.due}" if vt.due else ""
     await message.reply_text(
         f"📄 « {vt.titre} »\nNote : {vt.rel_path}{extra}\n"
         f"(reste {len(queue)} après celle-ci)\n\nCatégorie ?",
-        reply_markup=InlineKeyboardMarkup(rows))
+        reply_markup=_category_keyboard(context.bot_data["conn"], "scat"))
 
 
 async def cmd_llm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -779,6 +803,25 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text.strip()
 
     state = SESSIONS.get(chat_id)
+    pending_category = context.chat_data.get("pending_category_add")
+    if pending_category:
+        try:
+            code = db.create_category(context.bot_data["conn"], text)
+        except ValueError:
+            await update.message.reply_text(
+                "Nom de catégorie invalide. Envoie un libellé comme "
+                "« Administratif » ou « Maison ».")
+            return
+        context.chat_data.pop("pending_category_add", None)
+        prefix = pending_category.get("prefix", "cat")
+        extra = pending_category.get("extra", "")
+        await update.message.reply_text(
+            f"Catégorie ajoutée : {text.strip()}.\nChoisis une catégorie :",
+            reply_markup=_category_keyboard(context.bot_data["conn"], prefix, extra))
+        if prefix == "cat":
+            context.chat_data["last_added_category"] = code
+        return
+
     pending_deadline = context.chat_data.get("pending_newtask_deadline")
     if pending_deadline:
         if text.lower() in ("aucune", "aucun", "non"):
@@ -823,6 +866,80 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(
             f"📅 Deadline notée : {due.isoformat()} (J{days:+d}). Suite…")
         await _ask_next(update.message, chat_id, context)
+        return
+
+    if state is not None and state.get("awaiting_challenge_answer"):
+        questions = state.get("challenge_questions") or []
+        idx = state.get("challenge_index", 0)
+        question = questions[idx] if idx < len(questions) else ""
+        if text.lower() in ("passer", "skip"):
+            state["awaiting_challenge_answer"] = False
+            db.record_answer(
+                state["conn"], state["interview_id"],
+                f"CHALLENGE_{idx + 1}_NONE", None,
+                f"{question}\n\nQuestion passée par l'utilisateur.", 2)
+            state["challenge_index"] = idx + 1
+            await update.message.reply_text("Question passée.")
+            await _ask_challenge_question(update.message, context, state)
+            return
+        llm = context.bot_data.get("llm")
+        if not llm or not llm.available:
+            state["awaiting_challenge_answer"] = False
+            await update.message.reply_text(
+                "LLM indisponible : je passe cette question de vérification.")
+            await _ask_challenge_question(update.message, context, state)
+            return
+        task = state["conn"].execute(
+            "SELECT titre FROM tasks WHERE id=?", (state["task_id"],)).fetchone()
+        axes, _defaults = itv.final_axes(state["session"])
+        wait_msg = await update.message.reply_text("⏳ J'analyse ta réponse…")
+        interpreted = await asyncio.to_thread(
+            llm.interpret_challenge_answer,
+            task["titre"] if task else "",
+            state.get("challenge_subjective", ""),
+            question,
+            text,
+            {axis.value: value for axis, value in axes.items()},
+            _language(context),
+        )
+        try:
+            await wait_msg.delete()
+        except Exception:
+            pass
+        if interpreted is None:
+            await update.message.reply_text(
+                "Je n'ai pas pu interpréter cette réponse. "
+                f"Réessaie ou écris « passer ». Détail : {getattr(llm, 'last_error', '')}")
+            return
+        axis = interpreted.get("axis")
+        value = interpreted.get("value")
+        uncertainty = int(interpreted.get("uncertainty") or 0)
+        reason = interpreted.get("reason") or "Aucune raison fournie."
+        state["awaiting_challenge_answer"] = False
+        if axis is None:
+            db.record_answer(
+                state["conn"], state["interview_id"],
+                f"CHALLENGE_{idx + 1}_NONE", None,
+                f"{question}\n\n{text}\n\n{reason}", uncertainty)
+            state["challenge_index"] = idx + 1
+            await update.message.reply_text(f"Noté. {reason}")
+            await _ask_challenge_question(update.message, context, state)
+            return
+        state["pending_challenge_update"] = {
+            "axis": axis,
+            "value": int(value),
+            "uncertainty": uncertainty,
+            "reason": reason,
+            "question": question,
+            "answer": text,
+        }
+        rows = [[InlineKeyboardButton("✅ Appliquer", callback_data="chapply"),
+                 InlineKeyboardButton("Ne pas appliquer", callback_data="chskip")]]
+        await update.message.reply_text(
+            f"Réponse comprise : {reason}\n\n"
+            f"Proposition : axe {axis} = {value}\n\n"
+            "Appliquer cette correction au calcul du quadrant ?",
+            reply_markup=InlineKeyboardMarkup(rows))
         return
 
     if state is not None:
@@ -971,11 +1088,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         context.chat_data["pending_deadline_suggestion"] = (
             context.chat_data.get("impact_deadline_suggestion", "")
         )
-        rows = [[InlineKeyboardButton(_category_label(c), callback_data=f"cat|{c}")]
-                for c in CATEGORIES]
         await query.message.reply_text(
             f"Nouvelle tâche : « {context.chat_data['pending_title']} ». Catégorie ?",
-            reply_markup=InlineKeyboardMarkup(rows))
+            reply_markup=_category_keyboard(conn, "cat"))
 
     elif kind == "cfm" and chat_id in SESSIONS:
         state = SESSIONS[chat_id]
@@ -1004,8 +1119,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
             state["session"] = itv.answer(state["session"], q, value)
             if q == Q.SUBJECTIVE:
-                await _send_subjective_challenge(
-                    query.message, context, state, parsed.value)
+                if await _send_subjective_challenge(
+                        query.message, context, state, parsed.value):
+                    return
         await _ask_next(query.message, chat_id, context)
 
     elif kind == "edit" and chat_id in SESSIONS:
@@ -1020,10 +1136,19 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     elif kind == "newtask":
         titre = context.chat_data.get("pending_title", "Sans titre")
-        rows = [[InlineKeyboardButton(_category_label(c), callback_data=f"cat|{c}")]
-                for c in CATEGORIES]
         await query.message.reply_text(f"Nouvelle tâche : « {titre} ». Catégorie ?",
-                                       reply_markup=InlineKeyboardMarkup(rows))
+                                       reply_markup=_category_keyboard(conn, "cat"))
+
+    elif kind == "catadd":
+        prefix = rest[0] if rest else "cat"
+        extra = "|".join(part for part in rest[1:] if part)
+        context.chat_data["pending_category_add"] = {
+            "prefix": prefix,
+            "extra": f"{extra}|" if extra else "",
+        }
+        await query.message.reply_text(
+            "Nom de la nouvelle catégorie ?\n"
+            "Exemple : Administratif")
 
     elif kind == "ignore":
         context.chat_data.pop("pending_title", None)
@@ -1128,8 +1253,33 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                              value if isinstance(value, int) else None, str(raw))
         state["session"] = itv.answer(state["session"], q, value)
         if q == Q.SUBJECTIVE:
-            await _send_subjective_challenge(query.message, context, state, str(raw))
+            if await _send_subjective_challenge(query.message, context, state, str(raw)):
+                return
         await _ask_next(query.message, chat_id, context)
+
+    elif kind in ("chapply", "chskip") and chat_id in SESSIONS:
+        state = SESSIONS[chat_id]
+        pending = state.pop("pending_challenge_update", None)
+        if not pending:
+            return
+        idx = state.get("challenge_index", 0)
+        axis = pending["axis"] if kind == "chapply" else None
+        value = pending["value"]
+        if axis is not None:
+            state["session"] = itv.set_axis_probe(
+                state["session"], axis, value, pending["uncertainty"] >= 2)
+        db.record_answer(
+            state["conn"], state["interview_id"],
+            f"CHALLENGE_{idx + 1}_{axis or 'NONE'}",
+            value if axis is not None else None,
+            f"{pending['question']}\n\n{pending['answer']}\n\n{pending['reason']}",
+            pending["uncertainty"],
+        )
+        state["challenge_index"] = idx + 1
+        await query.message.reply_text(
+            "Correction appliquée." if axis is not None else
+            "Correction ignorée, réponse conservée en note.")
+        await _ask_challenge_question(query.message, context, state)
 
     elif kind == "mir" and chat_id in SESSIONS:
         state = SESSIONS[chat_id]
@@ -1193,11 +1343,9 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             else "⏸ Objectif suspendu (réactivable en base).")
 
     elif kind == "gmvcat":
-        rows = [[InlineKeyboardButton(_category_label(c),
-                                      callback_data=f"gmv|{rest[0]}|{c}")]
-                for c in CATEGORIES]
         await query.message.reply_text("Nouvelle catégorie ?",
-                                       reply_markup=InlineKeyboardMarkup(rows))
+                                       reply_markup=_category_keyboard(
+                                           conn, "gmv", f"{rest[0]}|"))
 
     elif kind == "gmv":
         db.set_goal_category(conn, int(rest[0]), rest[1])

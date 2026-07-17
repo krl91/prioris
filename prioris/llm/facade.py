@@ -398,6 +398,64 @@ class LLMFacade:
             return clean
         return None
 
+    def interpret_challenge_answer(
+        self,
+        task_title: str,
+        subjective: str,
+        question: str,
+        user_text: str,
+        current_axes: dict,
+        language: str = "fr",
+    ) -> dict | None:
+        """Interpret one challenge answer as a candidate axis update."""
+        if not self.available:
+            self.last_error = "LLM désactivé (enabled = false ou section absente)"
+            return None
+        lang = "en" if language == "en" else "fr"
+        payload = prompts.build_challenge_answer_payload(
+            task_title, subjective, question, user_text, current_axes, lang)
+        model = self._client.cfg.model
+        valid_axes = {axis.value for axis in Axis}
+        max_by_axis = {axis.value: AXIS_MAX[axis] for axis in Axis}
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            t0 = time.monotonic()
+            try:
+                raw = self._client.chat(prompts.CHALLENGE_ANSWER_SYSTEM, payload)
+                data = _extract_json(raw)
+                axis = data.get("axis")
+                if axis in ("", None, "null"):
+                    result = {
+                        "axis": None,
+                        "value": None,
+                        "uncertainty": int(data.get("uncertainty", 0) or 0),
+                        "reason": str(data.get("reason", "")).strip(),
+                    }
+                else:
+                    if axis not in valid_axes:
+                        raise ValueError(f"axe invalide : {axis!r}")
+                    value = int(data.get("value"))
+                    if value < 0 or value > max_by_axis[axis]:
+                        raise ValueError(f"valeur invalide pour {axis}: {value}")
+                    uncertainty = int(data.get("uncertainty", 0))
+                    if uncertainty not in (0, 1, 2):
+                        raise ValueError(f"incertitude invalide : {uncertainty}")
+                    result = {
+                        "axis": axis,
+                        "value": value,
+                        "uncertainty": uncertainty,
+                        "reason": str(data.get("reason", "")).strip(),
+                    }
+            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
+                self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
+                self._log("challenge_answer", model,
+                          int((time.monotonic() - t0) * 1000), False)
+                continue
+            self.last_error = None
+            self._log("challenge_answer", model,
+                      int((time.monotonic() - t0) * 1000), True)
+            return result
+        return None
+
     def warm_up(self) -> bool:
         """Load the model into memory through a tiny call.
 

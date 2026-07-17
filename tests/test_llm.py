@@ -608,6 +608,40 @@ def test_subjective_challenge_prioris_local():
     assert any("pression" in q.lower() for q in questions)
 
 
+def test_interpret_challenge_answer_valide_et_journalise():
+    calls = []
+    raw = json.dumps({
+        "axis": "CDR",
+        "value": 3,
+        "uncertainty": 0,
+        "reason": "Une échéance réelle est mentionnée.",
+    })
+    f = LLMFacade(
+        ChatClient(LLMConfig(enabled=True, provider="ollama", model="m"),
+                   fake_transport(raw)),
+        log_fn=lambda t, m, ms, ok: calls.append((t, m, ok)),
+    )
+    parsed = f.interpret_challenge_answer(
+        "Répondre au client", "P1", "Quelle échéance ?", "demain", {"CDR": 0})
+    assert parsed == {
+        "axis": "CDR",
+        "value": 3,
+        "uncertainty": 0,
+        "reason": "Une échéance réelle est mentionnée.",
+    }
+    assert calls == [("challenge_answer", "m", True)]
+
+
+def test_interpret_challenge_answer_prioris_local():
+    cfg = LLMConfig(enabled=True, provider="prioris", model="rules-v1")
+    f = LLMFacade(ChatClient(cfg))
+    parsed = f.interpret_challenge_answer(
+        "Répondre au client", "P1", "Quelle échéance ?", "deadline demain", {})
+    assert parsed is not None
+    assert parsed["axis"] == "CDR"
+    assert parsed["value"] == 3
+
+
 def test_extract_json_texte_parasite():
     assert _extract_json(f"Voici :\n{VALID}\nvoilà.")["valeur"] == 2
     with pytest.raises(ValueError):

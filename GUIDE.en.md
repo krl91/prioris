@@ -33,6 +33,11 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
+The macOS `llama-simple` runtime is ad-hoc signed in the release.
+`install_unix.sh` also removes the macOS quarantine attribute from the bundled
+runtime. This is not full Apple Developer notarization, but it avoids the common
+Gatekeeper block on the downloaded CLI binary.
+
 Linux x64:
 
 ```bash

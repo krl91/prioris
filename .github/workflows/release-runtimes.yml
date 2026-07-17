@@ -203,6 +203,8 @@ jobs:
           cp build/bin/llama-simple runtime/macos-arm64/
           find build/bin -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec cp -P {} runtime/macos-arm64/ \;
           ! find runtime/macos-arm64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
+          find runtime/macos-arm64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --force --sign - --timestamp=none {} \;
+          codesign --verify --verbose runtime/macos-arm64/llama-simple
           (cd runtime && zip -r ../runtime-macos-arm64.zip macos-arm64)
 
       - name: Upload workflow artifact
@@ -218,6 +220,7 @@ jobs:
           cp app/pyproject.toml app/README.md app/README.en.md app/GUIDE.md app/GUIDE.en.md app/config.example.toml bundle/prioris-macos-arm64/
           cp app/config.release.toml bundle/prioris-macos-arm64/config.toml
           cp -R runtime/macos-arm64 bundle/prioris-macos-arm64/runtime/
+          find bundle/prioris-macos-arm64/runtime/macos-arm64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --verify --verbose {} \;
           curl -L --retry 3 --retry-delay 5 "$MODEL_3B_URL" -o "bundle/prioris-macos-arm64/models/$MODEL_3B_FILE"
           cat > bundle/prioris-macos-arm64/models/README.md <<'EOF'
           Bundled default model:

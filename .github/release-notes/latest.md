@@ -10,6 +10,7 @@ Cette release est pensée pour une installation simple : téléchargez l'archive
 - Configuration `config.toml` incluse et prête pour la GUI locale.
 - Modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` inclus dans chaque bundle OS.
 - Runtime local `llama-simple` inclus, sans serveur local et sans port exposé.
+- Runtime macOS signé ad-hoc ; le script d'installation retire la quarantaine macOS du binaire inclus.
 - `ObsidianVault` inclus dans chaque bundle OS et aussi disponible séparément.
 - Installation offline des dépendances Python via `wheelhouse/`.
 - Tests automatisés inclus dans les bundles complets pour vérifier l'installation avec `python -m pytest`.

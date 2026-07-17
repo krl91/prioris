@@ -117,6 +117,10 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
+Sur macOS, lance bien `install_unix.sh` avant le premier démarrage : le runtime
+`llama-simple` est signé ad-hoc et le script retire la quarantaine du binaire
+inclus dans l'archive.
+
 Linux x64 :
 
 ```bash

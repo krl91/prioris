@@ -113,6 +113,10 @@ cd prioris-macos-arm64
 ./scripts/run_unix.sh
 ```
 
+On macOS, run `install_unix.sh` before the first launch: `llama-simple` is
+ad-hoc signed and the script removes the quarantine attribute from the bundled
+binary.
+
 Linux x64:
 
 ```bash

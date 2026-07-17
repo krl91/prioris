@@ -230,8 +230,12 @@ language = "en"
 ```
 
 Les calculs, scores et confirmations restent identiques. Quand un LLM est
-actif, PRIORIS affiche aussi 3 questions adaptées au titre de la tâche pour
-aider à situer le quadrant urgent/important avant la question instinctive.
+actif, tu peux répondre en texte libre à toutes les questions à choix :
+PRIORIS interprète la réponse, propose l'option comprise, puis attend ta
+confirmation. Si le LLM est KO/offline, l'interface repasse aux boutons. La
+réponse à « Instinctivement, tu la classes comment ? » ne force pas le score :
+elle déclenche des questions de challenge anti-biais pour vérifier urgence
+réelle, pression sociale, manque d'information ou importance sous-estimée.
 
 ### Telegram
 

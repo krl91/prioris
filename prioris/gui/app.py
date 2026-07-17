@@ -17,7 +17,7 @@ from ..core.axes import (AXIS_QUESTIONS, AXIS_MEDIAN, ESTIMATION_MIN,
                           Axis, Effort, Estimation,
                           Incertitude, Metadata, Priorite)
 from ..core.interview import Q
-from ..i18n import (axis_labels, normalize_language, options as i18n_options,
+from ..i18n import (normalize_language, options as i18n_options,
                     question_text, t)
 from ..llm import ChatClient, LLMConfig, LLMFacade, resolve
 from ..llm import health as llm_health
@@ -276,7 +276,7 @@ class InterviewDialog(tk.Toplevel):
         if q == Q.SUBJECTIVE:
             self._show_quadrant_helpers()
         self._q_var.set(question_text(q, self.language))
-        if self.llm and self.llm.available and q in itv.Q_TO_AXIS:
+        if self.llm and self.llm.available:
             self._show_text_answer(q)
         for lbl, val in i18n_options(q, self.language):
             ttk.Button(
@@ -302,6 +302,22 @@ class InterviewDialog(tk.Toplevel):
             ttk.Label(box, text=f"{i}. {question}", wraplength=470,
                       justify="left").pack(fill="x", padx=6, pady=2)
 
+    def _show_subjective_challenge(self, subjective: str) -> None:
+        """Display LLM challenge questions after the instinctive answer."""
+        if not self.llm or not self.llm.available:
+            return
+        self.config(cursor="watch")
+        self.update_idletasks()
+        questions = self.llm.subjective_challenge_questions(
+            self.task_title, subjective, self.language)
+        self.config(cursor="")
+        if not questions:
+            return
+        text = "Questions pour challenger ton instinct :\n" + "\n".join(
+            f"{i}. {question}" for i, question in enumerate(questions, start=1)
+        )
+        messagebox.showinfo("Challenge instinctif", text, parent=self)
+
     def _show_text_answer(self, q: Q) -> None:
         """Free-text LLM answer, always confirmed before recording."""
         box = ttk.LabelFrame(self._btn_frame, text="Réponse libre (LLM)")
@@ -318,11 +334,14 @@ class InterviewDialog(tk.Toplevel):
         text = text.strip()
         if not text:
             return
-        axis = itv.Q_TO_AXIS[q]
         self.config(cursor="watch")
         self.update_idletasks()
-        parsed = self.llm.interpret_answer(
-            axis, question_text(q, self.language), text) if self.llm else None
+        parsed = self.llm.interpret_question_answer(
+            self._current_question_text(q),
+            self._current_question_options(q),
+            text,
+            self.language,
+        ) if self.llm else None
         self.config(cursor="")
         if parsed is None:
             reason = getattr(self.llm, "last_error", None) if self.llm else "LLM absent"
@@ -334,22 +353,34 @@ class InterviewDialog(tk.Toplevel):
                 parent=self,
             )
             return
-        label = axis_labels(axis, self.language)[parsed.valeur]
+        label = next(
+            label for label, value in self._current_question_options(q)
+            if value == parsed.value
+        )
         doute = {0: "", 1: " (hésitation)", 2: " (grande incertitude)"}[
             parsed.incertitude]
         ok = messagebox.askyesno(
             "Confirmer l'interprétation",
             f"{parsed.reformulation}\n\n"
-            f"{axis.value} : « {label} »{doute}\n\n"
+            f"« {label} »{doute}\n\n"
             "C'est bien ça ?",
             parent=self,
         )
         if not ok:
             return
-        db.record_answer(self.conn, self.interview_id, parsed.axis.value,
-                         parsed.valeur, text, parsed.incertitude)
-        self.session = itv.answer(
-            self.session, q, (parsed.valeur, Incertitude(parsed.incertitude)))
+        if q in (Q.CLARIFICATION, Q.MIROIR):
+            self._apply_dynamic_text_answer(q, int(parsed.value))
+            return
+        value = self._typed_answer_value(q, parsed.value)
+        db.record_answer(
+            self.conn, self.interview_id, self._answer_axis_code(q),
+            None if parsed.value == "?" else (
+                value if isinstance(value, int) else None),
+            text, parsed.incertitude,
+        )
+        self.session = itv.answer(self.session, q, value)
+        if q == Q.SUBJECTIVE:
+            self._show_subjective_challenge(parsed.value)
         self._show_next()
 
     # ── answer handling ──────────────────────────────────────────────
@@ -374,7 +405,52 @@ class InterviewDialog(tk.Toplevel):
                 value if isinstance(value, int) else None, str(raw),
             )
         self.session = itv.answer(self.session, q, value)
+        if q == Q.SUBJECTIVE:
+            self._show_subjective_challenge(str(raw))
         self._show_next()
+
+    @staticmethod
+    def _typed_answer_value(q: Q, raw: str):
+        if raw == "?":
+            axis = itv.Q_TO_AXIS[q]
+            return (AXIS_MEDIAN[axis], Incertitude.NE_SAIT_PAS)
+        if q in (Q.SUBJECTIVE, Q.DEMANDEUR):
+            return raw
+        if q == Q.ESTIMATION:
+            return Estimation[str(raw)]
+        return int(raw)
+
+    @staticmethod
+    def _answer_axis_code(q: Q) -> str:
+        return itv.Q_TO_AXIS[q].value if q in itv.Q_TO_AXIS else q.value
+
+    def _current_question_text(self, q: Q) -> str:
+        if q == Q.CLARIFICATION:
+            c = self.session.pending
+            return c.question
+        if q == Q.MIROIR:
+            mq = itv.mirror_for(self.session)
+            return mq.question if mq else ""
+        return question_text(q, self.language)
+
+    def _current_question_options(self, q: Q) -> list[tuple[str, str]]:
+        if q == Q.CLARIFICATION:
+            c = self.session.pending
+            return [(lbl, str(i)) for i, (lbl, _axe, _val) in enumerate(c.options)]
+        if q == Q.MIROIR:
+            mq = itv.mirror_for(self.session)
+            return [(opt.label, str(i)) for i, opt in enumerate(mq.options)]
+        return i18n_options(q, self.language)
+
+    def _apply_dynamic_text_answer(self, q: Q, option_index: int) -> None:
+        if q == Q.CLARIFICATION:
+            c = self.session.pending
+            label, axis_code, raw_value = c.options[option_index]
+            incertain = label.lower().startswith("je ne sais pas")
+            self._on_clarify(axis_code, raw_value, incertain)
+            return
+        if q == Q.MIROIR:
+            self._on_miroir(option_index)
 
     # ── goal question ────────────────────────────────────────────────
 
@@ -382,6 +458,7 @@ class InterviewDialog(tk.Toplevel):
         self._q_var.set(question_text(Q.OBJECTIF, self.language))
         suggestion = None
         if self.llm and self.llm.available:
+            self._show_text_answer(Q.OBJECTIF)
             self.config(cursor="watch")
             self.update_idletasks()
             suggestion = self.llm.suggest_goal(
@@ -459,6 +536,8 @@ class InterviewDialog(tk.Toplevel):
     def _show_clarification(self) -> None:
         c = self.session.pending
         self._q_var.set(f"⚠️ {c.message}\n\n{c.question}")
+        if self.llm and self.llm.available:
+            self._show_text_answer(Q.CLARIFICATION)
         for lbl, axe, val in c.options:
             incertain = lbl.lower().startswith("je ne sais pas")
             ttk.Button(
@@ -511,6 +590,8 @@ class InterviewDialog(tk.Toplevel):
             self._finish()
             return
         self._q_var.set(f"🪞 Dernière vérification : {mq.question}")
+        if self.llm and self.llm.available:
+            self._show_text_answer(Q.MIROIR)
         for i, opt in enumerate(mq.options):
             ttk.Button(
                 self._btn_frame, text=opt.label,

@@ -197,9 +197,11 @@ objectif sans devoir interrompre l'entretien.
 - Le LLM est optionnel. Si `[llm] enabled = false`, la GUI fonctionne en
   boutons/scoring local. Si `[llm] enabled = true`, la GUI active le diagnostic,
   le préchauffage `keep_warm`, les suggestions d'objectif et l'interprétation
-  de réponses libres avec confirmation avant scoring. Elle affiche aussi, avant
-  la question instinctive, 3 questions formulées par le LLM à partir du titre de
-  la tâche pour aider à situer le quadrant urgent/important.
+  de réponses libres avec confirmation avant scoring. Les réponses libres sont
+  acceptées sur toutes les questions à choix. Si le LLM est KO/offline, la GUI
+  affiche l'erreur et repasse aux boutons. La réponse instinctive P1/P2/P3/P4
+  sert ensuite à formuler 3 questions de challenge anti-biais adaptées à la
+  tâche, sans modifier automatiquement le calcul.
 
 **Langue de l'interface d'entretien.** Le français est la valeur par défaut.
 Pour basculer les questions/options d'entretien en anglais :
@@ -902,14 +904,22 @@ Points clés :
 - **Si le bot signale une contradiction** (⚠️), il pose une question de
   clarification avec 3 choix. Réponds honnêtement : la correction s'applique
   à l'axe, jamais au score directement.
-- **Avec le LLM activé (V0.2)** : tu peux répondre en texte libre
-  (« honnêtement pas grand-chose, ça peut glisser »). Le bot reformule et
-  propose la valeur → tu confirmes ✅ ou corriges ✏️. L'hésitation détectée
-  (« je pense », « peut-être ») est enregistrée comme incertitude.
+- **Avec le LLM activé** : tu peux répondre en texte libre à toutes les
+  questions à choix (« honnêtement pas grand-chose, ça peut glisser »,
+  « plutôt P2 », « environ une heure », « c'est surtout le client »). Le bot
+  reformule et propose l'option comprise → tu confirmes ✅ ou corriges ✏️.
+  L'hésitation détectée (« je pense », « peut-être ») est enregistrée comme
+  incertitude quand la question le permet. Si le LLM est KO/offline, PRIORIS
+  explique l'échec et repasse aux boutons.
   Au début de l'entretien, si le LLM est disponible, PRIORIS ajoute 3 questions
   adaptées à la description de la tâche pour aider à distinguer urgent,
   important, les deux ou aucun des deux. Ces questions n'entrent pas dans le
   calcul : elles servent seulement à mieux répondre à la question de quadrant.
+  Après confirmation de la réponse « Instinctivement », PRIORIS utilise ce
+  P1/P2/P3/P4 pour poser 3 questions de challenge : est-ce une vraie échéance
+  ou seulement de la pression ? y a-t-il un impact mesurable ? manque-t-il une
+  information ? Ces questions servent à vérifier les biais possibles, pas à
+  changer automatiquement la réponse.
   Hors entretien, un message libre propose de créer la tâche.
 
 ### 2.3 Le plan du jour

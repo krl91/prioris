@@ -16,10 +16,10 @@ from importlib import resources
 
 from ..core import interview as itv
 from ..core import biases, planner, scoring
-from ..core.axes import (ESTIMATION_MIN, Effort, Estimation, Incertitude,
+from ..core.axes import (AXIS_MEDIAN, ESTIMATION_MIN, Effort, Estimation, Incertitude,
                          Metadata, Priorite)
 from ..core.interview import Q
-from ..i18n import axis_labels, options as i18n_options, question_text, t
+from ..i18n import options as i18n_options, question_text, t
 from ..store import db
 from .. import task_impact
 from .. import task_revision
@@ -121,6 +121,101 @@ async def _send_quadrant_helpers(message, context, state: dict) -> None:
     lines = [t("quadrant_helper_title", _language(context))]
     lines += [f"{i}. {question}" for i, question in enumerate(questions, start=1)]
     await message.reply_text("\n".join(lines))
+
+
+async def _send_subjective_challenge(message, context, state: dict,
+                                     subjective: str) -> None:
+    """Ask LLM challenge questions after the instinctive classification."""
+    if state.get("subjective_challenge_shown"):
+        return
+    llm = context.bot_data.get("llm")
+    if not llm or not llm.available:
+        return
+    if not await _ensure_llm_ready(message, context):
+        return
+    task = state["conn"].execute(
+        "SELECT titre FROM tasks WHERE id=?", (state["task_id"],)).fetchone()
+    questions = await asyncio.to_thread(
+        llm.subjective_challenge_questions,
+        task["titre"] if task else "",
+        subjective,
+        _language(context),
+    )
+    state["subjective_challenge_shown"] = True
+    if not questions:
+        return
+    lines = ["Questions pour challenger ton instinct :"]
+    lines += [f"{i}. {question}" for i, question in enumerate(questions, start=1)]
+    await message.reply_text("\n".join(lines))
+
+
+def _typed_answer_value(q: Q, raw: str):
+    """Convert a button/free-text option value to the type expected by core."""
+    if raw == "?":
+        axis = itv.Q_TO_AXIS[q]
+        return (AXIS_MEDIAN[axis], Incertitude.NE_SAIT_PAS)
+    if q in (Q.SUBJECTIVE, Q.DEMANDEUR):
+        return raw
+    if q == Q.ESTIMATION:
+        return Estimation[raw]
+    return int(raw)
+
+
+def _answer_axis_code(q: Q) -> str:
+    return itv.Q_TO_AXIS[q].value if q in itv.Q_TO_AXIS else q.value
+
+
+def _current_question_options(state: dict, q: Q, lang: str) -> list[tuple[str, str]]:
+    if q == Q.CLARIFICATION:
+        c = state["session"].pending
+        return [(lbl, str(i)) for i, (lbl, _axe, _val) in enumerate(c.options)]
+    if q == Q.MIROIR:
+        mq = itv.mirror_for(state["session"])
+        return [(opt.label, str(i)) for i, opt in enumerate(mq.options)]
+    return i18n_options(q, lang)
+
+
+def _current_question_text(state: dict, q: Q, lang: str) -> str:
+    if q == Q.CLARIFICATION:
+        c = state["session"].pending
+        return c.question
+    if q == Q.MIROIR:
+        mq = itv.mirror_for(state["session"])
+        return mq.question if mq else ""
+    return question_text(q, lang)
+
+
+async def _apply_dynamic_answer(message, context, state: dict, q: Q,
+                                option_index: int) -> bool:
+    if q == Q.CLARIFICATION:
+        c = state["session"].pending
+        label, axis_code, raw_value = c.options[option_index]
+        if axis_code == "DATE":
+            state["session"] = itv.promise_deadline(state["session"])
+            state["awaiting_date"] = True
+            await message.reply_text(
+                "Quelle est la date butoir ? (format AAAA-MM-JJ, ex. 2026-07-20)")
+            return True
+        incertain = label.lower().startswith("je ne sais pas")
+        db.record_answer(state["conn"], state["interview_id"],
+                         axis_code, int(raw_value), label,
+                         2 if incertain else 0)
+        state["session"] = itv.clarify(
+            state["session"], axis_code, int(raw_value), incertain)
+        await message.reply_text("Noté, axe corrigé. Suite…")
+        await _ask_next(message, message.chat_id, context)
+        return True
+    if q == Q.MIROIR:
+        mq = itv.mirror_for(state["session"])
+        opt = mq.options[option_index]
+        db.record_answer(state["conn"], state["interview_id"],
+                         f"MIROIR_{mq.code}",
+                         opt.valeur if opt.axe else None, opt.label,
+                         2 if opt.incertain else 0)
+        state["session"] = itv.mirror_answer(state["session"], option_index)
+        await _ask_next(message, message.chat_id, context)
+        return True
+    return False
 
 
 async def _ask_next(message, chat_id: int, context) -> None:
@@ -732,20 +827,25 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if state is not None:
         q = state.get("current_q")
-        if q is None or q == Q.CLARIFICATION or q not in itv.Q_TO_AXIS:
+        if q is None:
             await update.message.reply_text(
                 "Réponds avec les boutons de la question ci-dessus 🙏")
             return
         llm = context.bot_data.get("llm")
-        axis = itv.Q_TO_AXIS[q]
         parsed = None
+        options = _current_question_options(state, q, _language(context))
         if llm and llm.available and await _ensure_llm_ready(update.message, context):
             # Immediate feedback: interpretation can be slow on a cold model.
             wait_msg = await update.message.reply_text("⏳ J'interprète ta réponse…")
             await update.message.chat.send_action("typing")
             # asyncio.to_thread keeps HTTP calls from freezing the bot.
             parsed = await asyncio.to_thread(
-                llm.interpret_answer, axis, question_text(q, _language(context)), text)
+                llm.interpret_question_answer,
+                _current_question_text(state, q, _language(context)),
+                options,
+                text,
+                _language(context),
+            )
             try:
                 await wait_msg.delete()
             except Exception:
@@ -755,16 +855,20 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text(
                 "Je n'ai pas pu interpréter — mode boutons :"
                 + (f"\n(détail : {raison} — /llm pour diagnostiquer)" if raison else ""),
-                reply_markup=_keyboard(q, _language(context)))
+                reply_markup=None if q in (Q.CLARIFICATION, Q.MIROIR)
+                else _keyboard(q, _language(context)))
             return
-        state["nlu"] = {"q": q, "texte": text, "parsed": parsed}
+        state["question_nlu"] = {"q": q, "texte": text, "parsed": parsed}
         doute = {0: "", 1: " (avec une part d'hésitation)",
                  2: " (grande incertitude)"}[parsed.incertitude]
-        label = axis_labels(axis, _language(context))[parsed.valeur]
+        label = next(
+            label for label, value in options
+            if value == parsed.value
+        )
         rows = [[InlineKeyboardButton("✅ Oui", callback_data="cfm"),
                  InlineKeyboardButton("✏️ Corriger", callback_data="edit")]]
         await update.message.reply_text(
-            f"{parsed.reformulation}\n→ {axis.value} : « {label} »{doute}. "
+            f"{parsed.reformulation}\n→ « {label} »{doute}. "
             "C'est bien ça ?", reply_markup=InlineKeyboardMarkup(rows))
         return
 
@@ -875,23 +979,41 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     elif kind == "cfm" and chat_id in SESSIONS:
         state = SESSIONS[chat_id]
-        nlu = state.pop("nlu", None)
+        nlu = state.pop("question_nlu", None) or state.pop("nlu", None)
         if not nlu:
             return
         q, parsed = nlu["q"], nlu["parsed"]
-        inc = Incertitude(parsed.incertitude)
-        db.record_answer(state["conn"], state["interview_id"],
-                         parsed.axis.value, parsed.valeur, nlu["texte"],
-                         parsed.incertitude)
-        state["session"] = itv.answer(state["session"], q,
-                                      (parsed.valeur, inc))
+        if hasattr(parsed, "axis"):
+            inc = Incertitude(parsed.incertitude)
+            db.record_answer(state["conn"], state["interview_id"],
+                             parsed.axis.value, parsed.valeur, nlu["texte"],
+                             parsed.incertitude)
+            state["session"] = itv.answer(state["session"], q,
+                                          (parsed.valeur, inc))
+        else:
+            if q in (Q.CLARIFICATION, Q.MIROIR):
+                if await _apply_dynamic_answer(
+                        query.message, context, state, q, int(parsed.value)):
+                    return
+            value = _typed_answer_value(q, parsed.value)
+            db.record_answer(
+                state["conn"], state["interview_id"], _answer_axis_code(q),
+                None if parsed.value == "?" else (
+                    value if isinstance(value, int) else None),
+                nlu["texte"], parsed.incertitude,
+            )
+            state["session"] = itv.answer(state["session"], q, value)
+            if q == Q.SUBJECTIVE:
+                await _send_subjective_challenge(
+                    query.message, context, state, parsed.value)
         await _ask_next(query.message, chat_id, context)
 
     elif kind == "edit" and chat_id in SESSIONS:
         state = SESSIONS[chat_id]
+        state.pop("question_nlu", None)
         state.pop("nlu", None)
         q = state.get("current_q")
-        if q and q in itv.Q_TO_AXIS:
+        if q and q not in (Q.CLARIFICATION, Q.MIROIR):
             await query.message.reply_text(
                 question_text(q, _language(context)),
                 reply_markup=_keyboard(q, _language(context)))
@@ -995,18 +1117,18 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         q = Q(rest[0])
         raw = rest[1]
         if raw == "?":   # je ne sais pas → médiane + incertitude (§6.2)
-            from ..core.axes import AXIS_MEDIAN
             axis = itv.Q_TO_AXIS[q]
             value = (AXIS_MEDIAN[axis], Incertitude.NE_SAIT_PAS)
             db.record_answer(state["conn"], state["interview_id"], axis.value,
                              None, "je ne sais pas", 2)
         else:
-            value = raw if q in (Q.SUBJECTIVE, Q.DEMANDEUR) else \
-                    Estimation[raw] if q == Q.ESTIMATION else int(raw)
-            axe = itv.Q_TO_AXIS[q].value if q in itv.Q_TO_AXIS else q.value
+            value = _typed_answer_value(q, raw)
+            axe = _answer_axis_code(q)
             db.record_answer(state["conn"], state["interview_id"], axe,
                              value if isinstance(value, int) else None, str(raw))
         state["session"] = itv.answer(state["session"], q, value)
+        if q == Q.SUBJECTIVE:
+            await _send_subjective_challenge(query.message, context, state, str(raw))
         await _ask_next(query.message, chat_id, context)
 
     elif kind == "mir" and chat_id in SESSIONS:

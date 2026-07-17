@@ -222,8 +222,12 @@ language = "en"
 ```
 
 Scoring, priorities and confirmations stay identical. When an LLM is active,
-PRIORIS also displays 3 task-specific questions before the instinctive
-quadrant question to help separate urgent/important from the other quadrants.
+you can answer every choice-based question in free text: PRIORIS interprets the
+answer, proposes the understood option, then waits for your confirmation. If the
+LLM is down/offline, the UI falls back to buttons. The answer to “Instinctively,
+how would you classify it?” does not force the score: it triggers anti-bias
+challenge questions to check real urgency, social pressure, missing facts, or
+underestimated importance.
 
 ### Telegram
 

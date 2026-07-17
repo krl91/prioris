@@ -370,6 +370,32 @@ def test_nlu_json_dans_cloture_markdown():
     assert r is not None and r.valeur == 2
 
 
+def test_question_nlu_valide_pour_priorite_subjective():
+    raw = json.dumps({
+        "value": "P2",
+        "incertitude": 1,
+        "reformulation": "Tu la vois importante mais pas urgente.",
+    })
+    r = facade_with(raw).interpret_question_answer(
+        "Instinctivement, tu la classes comment ?",
+        [("P1", "P1"), ("P2", "P2"), ("P3", "P3"), ("P4", "P4")],
+        "plutôt important mais pas urgent",
+    )
+    assert r is not None
+    assert (r.value, r.incertitude) == ("P2", 1)
+    assert "importante" in r.reformulation
+
+
+def test_question_nlu_rejette_option_inconnue():
+    raw = json.dumps({
+        "value": "P9",
+        "incertitude": 0,
+        "reformulation": "Tu choisis une option inexistante.",
+    })
+    assert facade_with(raw).interpret_question_answer(
+        "q", [("P1", "P1")], "texte") is None
+
+
 def test_valeur_hors_echelle_rejetee():
     bad = json.dumps({"valeur": 9, "incertitude": 0, "reformulation": "x"})
     assert facade_with(bad).interpret_answer(Axis.BLK, "q", "t") is None
@@ -548,6 +574,38 @@ def test_quadrant_questions_prioris_local_en_anglais():
     assert len(questions) == 3
     assert all("?" in q for q in questions)
     assert "What concrete problem" in questions[0]
+
+
+def test_subjective_challenge_questions_valide_et_journalise():
+    calls = []
+    raw = json.dumps({
+        "questions": [
+            "Quelle vraie échéance justifie P1 ?",
+            "Est-ce une pression visible ou un impact réel ?",
+            "Quel fait te ferait changer d'avis ?",
+        ],
+    })
+    f = LLMFacade(
+        ChatClient(LLMConfig(enabled=True, provider="ollama", model="m"),
+                   fake_transport(raw)),
+        log_fn=lambda t, m, ms, ok: calls.append((t, m, ok)),
+    )
+    questions = f.subjective_challenge_questions("Répondre au client", "P1")
+    assert questions == [
+        "Quelle vraie échéance justifie P1 ?",
+        "Est-ce une pression visible ou un impact réel ?",
+        "Quel fait te ferait changer d'avis ?",
+    ]
+    assert calls == [("subjective_challenge", "m", True)]
+
+
+def test_subjective_challenge_prioris_local():
+    cfg = LLMConfig(enabled=True, provider="prioris", model="rules-v1")
+    f = LLMFacade(ChatClient(cfg))
+    questions = f.subjective_challenge_questions("Répondre au client", "P1")
+    assert questions is not None
+    assert len(questions) == 3
+    assert any("pression" in q.lower() for q in questions)
 
 
 def test_extract_json_texte_parasite():

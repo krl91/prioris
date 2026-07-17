@@ -348,9 +348,14 @@ supported. Prefer `api_key_env` for secrets.
 
 When `[ui] language = "en"` is set, the interview questions/options are shown
 in English. French remains the default. Scoring and confirmations are unchanged.
-When an LLM is available, PRIORIS also asks 3 task-specific helper questions
-before the instinctive quadrant question; they help the user reason about
-urgent vs important but never affect the score directly.
+When an LLM is available, free-text answers are accepted for every
+choice-based question. PRIORIS interprets the answer, proposes the understood
+option, then waits for confirmation. If the LLM is down/offline, the UI falls
+back to buttons. PRIORIS also asks 3 task-specific helper questions before the
+instinctive quadrant question; after the instinctive P1/P2/P3/P4 answer is
+confirmed, it asks 3 challenge questions to check real urgency, social pressure,
+missing facts or underestimated importance. These questions never change the
+score automatically.
 
 ## 6. Core Workflow
 

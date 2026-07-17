@@ -33,6 +33,13 @@ class InterpretedAnswer:
     reformulation: str
 
 
+@dataclass(frozen=True)
+class InterpretedQuestionAnswer:
+    value: str
+    incertitude: int          # 0 | 1 | 2
+    reformulation: str
+
+
 def _extract_json(text: str) -> dict:
     """Tolerate markdown fences and stray text around the JSON object."""
     text = text.strip()
@@ -95,6 +102,51 @@ class LLMFacade:
                 continue
             self.last_error = None
             self._log("nlu", model, int((time.monotonic() - t0) * 1000), True)
+            return result
+        return None
+
+    def interpret_question_answer(
+        self,
+        question: str,
+        options: list[tuple[str, str]],
+        user_text: str,
+        language: str = "fr",
+    ) -> InterpretedQuestionAnswer | None:
+        """Convert free text to one existing button option."""
+        if not self.available:
+            self.last_error = "LLM désactivé (enabled = false ou section absente)"
+            return None
+        valid_values = {value for _, value in options}
+        payload = prompts.build_question_interpret_payload(
+            question, options, user_text, language)
+        model = self._client.cfg.model
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            t0 = time.monotonic()
+            try:
+                raw = self._client.chat(prompts.QUESTION_INTERPRETER_SYSTEM, payload)
+                data = _extract_json(raw)
+                value = str(data["value"]).strip()
+                incertitude = data.get("incertitude", 0)
+                reformulation = str(data.get("reformulation", "")).strip()
+                if value not in valid_values:
+                    raise ValueError(f"value invalide : {value!r}")
+                if incertitude not in (0, 1, 2):
+                    raise ValueError(f"incertitude invalide : {incertitude!r}")
+                if not reformulation:
+                    raise ValueError("reformulation vide")
+                result = InterpretedQuestionAnswer(
+                    value=value,
+                    incertitude=int(incertitude),
+                    reformulation=reformulation,
+                )
+            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
+                self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
+                self._log("question_nlu", model,
+                          int((time.monotonic() - t0) * 1000), False)
+                continue
+            self.last_error = None
+            self._log("question_nlu", model,
+                      int((time.monotonic() - t0) * 1000), True)
             return result
         return None
 
@@ -303,6 +355,45 @@ class LLMFacade:
                 continue
             self.last_error = None
             self._log("quadrant_questions", model,
+                      int((time.monotonic() - t0) * 1000), True)
+            return clean
+        return None
+
+    def subjective_challenge_questions(
+        self,
+        task_title: str,
+        subjective: str,
+        language: str = "fr",
+    ) -> list[str] | None:
+        """Challenge the user's instinctive quadrant without changing it."""
+        if not self.available:
+            self.last_error = "LLM désactivé (enabled = false ou section absente)"
+            return None
+        lang = "en" if language == "en" else "fr"
+        payload = prompts.build_subjective_challenge_payload(
+            task_title, subjective, lang)
+        model = self._client.cfg.model
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            t0 = time.monotonic()
+            try:
+                raw = self._client.chat(prompts.SUBJECTIVE_CHALLENGE_SYSTEM, payload)
+                data = _extract_json(raw)
+                questions = data.get("questions")
+                if not isinstance(questions, list) or len(questions) != 3:
+                    raise ValueError("questions doit contenir exactement 3 éléments")
+                clean = []
+                for question in questions:
+                    text = str(question).strip()
+                    if not text or len(text) > 220:
+                        raise ValueError(f"question invalide : {question!r}")
+                    clean.append(text)
+            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
+                self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
+                self._log("subjective_challenge", model,
+                          int((time.monotonic() - t0) * 1000), False)
+                continue
+            self.last_error = None
+            self._log("subjective_challenge", model,
                       int((time.monotonic() - t0) * 1000), True)
             return clean
         return None

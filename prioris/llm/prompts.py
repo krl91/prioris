@@ -23,6 +23,26 @@ Incertitude : 0 = réponse nette ; 1 = hésitation ("je pense", "sans doute",
 "ça dépend", "peut-être") ; 2 = "je ne sais pas" ou réponse hors sujet.
 La reformulation est en français, à la deuxième personne, factuelle."""
 
+QUESTION_INTERPRETER_SYSTEM = """Tu es l'intervieweur d'un assistant de
+priorisation de tâches.
+
+Ton rôle : transformer une réponse libre de l'utilisateur en UNE option parmi
+les options fournies.
+
+Règles absolues :
+- Tu ne calcules jamais de priorité, de score ou de classement.
+- Tu ne choisis qu'une option existante dans `options`.
+- Si la réponse est floue, choisis l'option la plus prudente et marque
+  l'incertitude.
+- Tu réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"value": "<value exacte d'une option>", "incertitude": <0, 1 ou 2>,
+ "reformulation": "<une phrase factuelle reformulant ce que tu as compris>"}
+
+Incertitude : 0 = réponse nette ; 1 = hésitation ; 2 = je ne sais pas,
+réponse trop floue ou hors sujet."""
+
 
 GOAL_MATCH_SYSTEM = """Tu relies une tâche à un objectif de vie de l'utilisateur.
 Tu ne décides rien : tu SUGGÈRES, l'utilisateur confirmera par bouton.
@@ -97,6 +117,23 @@ Règles absolues :
 Format :
 {"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
 
+SUBJECTIVE_CHALLENGE_SYSTEM = """Tu aides l'utilisateur à vérifier son classement
+instinctif d'une tâche dans la matrice urgent/important.
+
+Règles absolues :
+- Tu ne calcules jamais la priorité finale.
+- Tu ne remplaces jamais la réponse de l'utilisateur.
+- Tu poses exactement 3 questions courtes qui challengent le classement
+  instinctif indiqué.
+- Les questions doivent chercher les biais possibles : urgence ressentie vs
+  vraie échéance, pression sociale/visibilité, évitement d'une tâche importante,
+  manque d'information concrète.
+- Adapte les questions au quadrant instinctif.
+- Réponds UNIQUEMENT en JSON strict, sans texte autour.
+
+Format :
+{"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
+
 
 def build_goal_match_payload(task_title: str,
                              goals: list[tuple[int, str]]) -> str:
@@ -123,6 +160,16 @@ def build_interpret_payload(axis: Axis, question: str, user_text: str) -> str:
     }, ensure_ascii=False)
 
 
+def build_question_interpret_payload(question: str, options: list[tuple[str, str]],
+                                     user_text: str, language: str) -> str:
+    return json.dumps({
+        "question_posee": question,
+        "options": [{"label": label, "value": value} for label, value in options],
+        "reponse_utilisateur": user_text,
+        "langue": "anglais" if language == "en" else "français",
+    }, ensure_ascii=False)
+
+
 def build_task_revision_payload(context: dict, note: str) -> str:
     return json.dumps({
         "tache": context["task"],
@@ -142,6 +189,20 @@ def build_task_impact_payload(tasks: list[tuple[int, str]], note: str) -> str:
 def build_quadrant_questions_payload(task_title: str, language: str) -> str:
     return json.dumps({
         "tache": task_title,
+        "langue": "anglais" if language == "en" else "français",
+        "objectif": (
+            "Formule les 3 questions en anglais."
+            if language == "en" else
+            "Formule les 3 questions en français."
+        ),
+    }, ensure_ascii=False)
+
+
+def build_subjective_challenge_payload(task_title: str, subjective: str,
+                                       language: str) -> str:
+    return json.dumps({
+        "tache": task_title,
+        "classement_instinctif": subjective,
         "langue": "anglais" if language == "en" else "français",
         "objectif": (
             "Formule les 3 questions en anglais."

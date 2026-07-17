@@ -112,6 +112,71 @@ def _interpret(payload: dict) -> dict:
     }
 
 
+def _interpret_question(payload: dict) -> dict:
+    text = _norm(payload.get("reponse_utilisateur", ""))
+    options = payload.get("options", [])
+    incertitude = 0
+    if any(p in text for p in (_norm(x) for x in UNCERTAIN)):
+        incertitude = 2 if "sais pas" in text or "aucune idee" in text else 1
+
+    def option_by_value(value: str):
+        for opt in options:
+            if str(opt.get("value")) == value:
+                return opt
+        return None
+
+    value = None
+    if re.search(r"\bp\s*1\b", text) or "urgent et important" in text:
+        value = "P1"
+    elif re.search(r"\bp\s*2\b", text) or "important pas urgent" in text:
+        value = "P2"
+    elif re.search(r"\bp\s*3\b", text) or "urgent pas important" in text:
+        value = "P3"
+    elif re.search(r"\bp\s*4\b", text) or "ni urgent" in text:
+        value = "P4"
+    elif "client" in text:
+        value = "client"
+    elif "manager" in text or "chef" in text:
+        value = "manager"
+    elif "collegue" in text or "collègue" in text:
+        value = "collegue"
+    elif "moi" in text:
+        value = "moi"
+    elif "faible" in text or "peu" in text:
+        value = "1"
+    elif "eleve" in text or "élevé" in text or "fort" in text:
+        value = "3"
+    elif "moyen" in text or "normal" in text:
+        value = "2"
+    elif "aucun" in text or "nulle" in text or "rien" in text:
+        value = "0"
+    elif "15" in text and ("30" not in text):
+        value = "LT15"
+    elif "30" in text and "60" not in text:
+        value = "M15_30"
+    elif "60" in text or "1 h" in text or "1h" in text:
+        value = "M30_60"
+    elif "2 h" in text or "2h" in text:
+        value = "H1_2"
+    elif "4 h" in text or "4h" in text:
+        value = "H2_4"
+    elif "plus de 4" in text or ">4" in text:
+        value = "GT4"
+
+    if value is None or option_by_value(value) is None:
+        value = str(options[0].get("value")) if options else ""
+        incertitude = max(incertitude, 1)
+    if incertitude == 2 and option_by_value("?") is not None:
+        value = "?"
+    return {
+        "value": value,
+        "incertitude": incertitude,
+        "reformulation": "Tu indiques : " + (
+            payload.get("reponse_utilisateur", "").strip() or "réponse imprécise"
+        ) + ".",
+    }
+
+
 def _goal_match(payload: dict) -> dict:
     task_tokens = _tokens(payload.get("tache", ""))
     best_id = None
@@ -235,6 +300,23 @@ def _quadrant_questions(payload: dict) -> dict:
     ]}
 
 
+def _subjective_challenge(payload: dict) -> dict:
+    title = payload.get("tache", "").strip() or "cette tâche"
+    subjective = payload.get("classement_instinctif", "")
+    lang = payload.get("langue", "français")
+    if lang == "anglais":
+        return {"questions": [
+            f"What hard deadline or real damage would make '{title}' truly {subjective}?",
+            f"Are you reacting to external pressure/visibility, or to measurable impact?",
+            f"What fact would make you downgrade or upgrade your first instinct?",
+        ]}
+    return {"questions": [
+        f"Quel fait concret rend vraiment « {title} » compatible avec {subjective} ?",
+        "Réagis-tu à une pression/visibilité externe, ou à un impact mesurable ?",
+        "Quel élément te ferait baisser ou monter ce classement instinctif ?",
+    ]}
+
+
 def chat(system: str, user: str) -> str:
     """Return a JSON response compatible with ChatClient.chat."""
     if '"ping": true' in user:
@@ -244,6 +326,8 @@ def chat(system: str, user: str) -> str:
     payload = json.loads(user)
     if system == prompts.INTERVIEWER_SYSTEM:
         return json.dumps(_interpret(payload), ensure_ascii=False)
+    if system == prompts.QUESTION_INTERPRETER_SYSTEM:
+        return json.dumps(_interpret_question(payload), ensure_ascii=False)
     if system == prompts.GOAL_MATCH_SYSTEM:
         return json.dumps(_goal_match(payload), ensure_ascii=False)
     if system == prompts.GOAL_AUDIT_SYSTEM:
@@ -254,4 +338,6 @@ def chat(system: str, user: str) -> str:
         return json.dumps(_task_impact(payload), ensure_ascii=False)
     if system == prompts.QUADRANT_QUESTIONS_SYSTEM:
         return json.dumps(_quadrant_questions(payload), ensure_ascii=False)
+    if system == prompts.SUBJECTIVE_CHALLENGE_SYSTEM:
+        return json.dumps(_subjective_challenge(payload), ensure_ascii=False)
     return "{}"

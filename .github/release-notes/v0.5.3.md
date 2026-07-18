@@ -11,7 +11,7 @@
   ou vitales, tout en laissant les réponses ambiguës au LLM ou aux boutons.
 - Une réponse qui corrige une prémisse et apporte aussi un fait exploitable peut
   toujours produire une proposition d'axe, soumise à confirmation.
-- La suite compte désormais 224 tests. Les archives sont en plus vérifiées
+- La suite compte désormais 225 tests. Les archives sont en plus vérifiées
   après construction avec le véritable modèle GGUF embarqué sur chaque OS pour
   ces trois régressions.
 

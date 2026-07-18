@@ -242,7 +242,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `224 passed`.
+Expected result: `225 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +261,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `224 passed`.
+Expected result: `225 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -460,6 +460,13 @@ uncertainty, and continues with `no_change`, because confirming or rejecting a
 hypothesis alone does not provide a numeric axis value. For “Is social pressure
 influencing P1?”, `no` rejects the proposed bias; it is neither a failure nor a
 reason to change `CDR`, `IMP`, or another axis.
+
+An explicit rejection with no additional fact, such as “the question contains
+false information,” follows the same deterministic path: no LLM call is needed,
+interpretation uncertainty is zero, no axis changes, and the interview
+continues. If the same answer also contains a usable fact such as a deadline or
+an immediate action, the LLM is still called to propose at most one confirmable
+correction.
 
 The final mirror question uses the same conservative safeguard when its three
 options represent a real problem, nothing serious, and unknown. An explicitly
@@ -707,7 +714,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 224 passing automated tests.
+- 225 passing automated tests.
 
 Still possible future work:
 

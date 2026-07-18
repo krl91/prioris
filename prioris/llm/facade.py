@@ -99,11 +99,32 @@ def _contests_premise(text: str) -> bool:
         "question fausse",
         "question est fausse",
         "information fausse",
+        "information est fausse",
+        "comporte une information fausse",
+        "contient une information fausse",
         "hypothese fausse",
+        "premise is false",
+        "question is false",
+        "contains false information",
         "ce n est pas vrai",
         "c est faux",
         "au contraire",
     ))
+
+
+def _has_scorable_challenge_fact(text: str) -> bool:
+    """Detect whether a premise rejection also contains a usable fact."""
+    normalized = _normalize_free_text(text)
+    markers = (
+        "deadline", "echeance", "retard", "ce soir", "demain",
+        "aujourd hui", "avant midi", "avant ce soir", "dois agir",
+        "faut agir", "agir maintenant", "action immediate", "immediatement",
+        "bloque", "attend", "depend", "impact", "important", "objectif",
+        "consequence", "irreversible", "irreversibilite",
+    )
+    return any(marker in normalized for marker in markers) or bool(
+        re.search(r"\b(?:avant|d ici)\s+\d{1,2}(?:\s*h\s*\d{0,2})?\b", normalized)
+    )
 
 
 def _binary_answer(text: str) -> bool | None:
@@ -544,6 +565,23 @@ class LLMFacade:
                 "uncertainty": 0,
                 "reason": reason,
                 "outcome": "no_change",
+            }
+        if (_contests_premise(user_text)
+                and not _has_scorable_challenge_fact(user_text)):
+            self.last_error = None
+            self._log("challenge_answer", self._client.cfg.model, 0, True)
+            return {
+                "axis": None,
+                "value": None,
+                "uncertainty": 0,
+                "reason": (
+                    "The answer explicitly rejects the question's premise; "
+                    "no factual axis correction is required."
+                    if language == "en" else
+                    "La réponse rejette explicitement la prémisse de la "
+                    "question ; aucune correction factuelle d'axe n'est requise."
+                ),
+                "outcome": "premise_false",
             }
         lang = "en" if language == "en" else "fr"
         payload = prompts.build_challenge_answer_payload(

@@ -152,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `224 passed`.
+Expected result in a full source repository clone: `225 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -236,7 +236,8 @@ question may have a false premise: state that freely. PRIORIS records the
 objection and continues without changing the score; if the answer also gives a
 scorable fact, it proposes the corresponding correction. LLM abstention never
 blocks an anti-bias question. Short `yes` and `no` answers are recognized
-directly as complete, certain answers. The mirror check also recognizes
+directly as complete, certain answers. An explicit premise rejection with no
+other fact is also recognized before the LLM call. The mirror check recognizes
 explicitly severe or vital consequences without forcing ambiguous answers into
 an arbitrary option.
 
@@ -312,7 +313,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-224 tests pass locally. Remaining possible improvements: advanced scenario
+225 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

@@ -695,13 +695,33 @@ def test_interpret_challenge_abstention_ne_bloque_pas_entretien():
 
     parsed = facade.interpret_challenge_answer(
         "Manger", "P1", "Pourquoi aucune action immédiate ?",
-        "La question comporte une information fausse.", {})
+        "Je ne sais pas encore.", {})
 
     assert parsed is not None
     assert parsed["axis"] is None
     assert parsed["uncertainty"] == 2
-    assert parsed["outcome"] == "premise_false"
+    assert parsed["outcome"] == "no_change"
     assert facade.last_error is None
+
+
+def test_contestation_simple_n_appelle_pas_le_llm():
+    calls = []
+
+    def transport(*args):
+        calls.append(args)
+        raise AssertionError("le modèle ne doit pas être appelé")
+
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="ollama", model="m"), transport))
+    parsed = facade.interpret_challenge_answer(
+        "Manger", "P1", "Pourquoi aucune action immédiate ?",
+        "La question comporte une information fausse.", {})
+
+    assert parsed is not None
+    assert parsed["axis"] is None
+    assert parsed["uncertainty"] == 0
+    assert parsed["outcome"] == "premise_false"
+    assert calls == []
 
 
 def test_interpret_challenge_local_reconnait_premisse_fausse():

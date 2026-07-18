@@ -16,7 +16,10 @@ from prioris.llm.facade import LLMFacade
 def main() -> int:
     config_path = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "config.toml")
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    facade = LLMFacade(ChatClient(LLMConfig.from_dict(config["llm"])))
+    client = ChatClient(LLMConfig.from_dict(config["llm"]))
+    # Load the real bundled binary and GGUF while keeping CI inference short.
+    client.chat("Reply with OK only.", "OK", json_mode=False, max_tokens=4)
+    facade = LLMFacade(client)
     result = facade.interpret_challenge_answer(
         "Manger",
         "P1",

@@ -372,7 +372,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `224 passed`.
+Résultat attendu : `225 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,7 +391,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `224 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `225 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.6 Rappels pour Obsidian et Windows
@@ -1206,6 +1206,13 @@ hypothèse ne fournit pas à lui seul une valeur numérique pour un axe. Exemple
 biais proposé est rejeté ; ce n'est ni une panne ni une raison de modifier
 `CDR`, `IMP` ou un autre axe.
 
+Une contestation explicite sans fait supplémentaire, par exemple « la question
+comporte une information fausse », suit le même chemin déterministe : aucun
+appel LLM n'est nécessaire, l'incertitude d'interprétation vaut zéro, aucun axe
+n'est modifié et l'entretien continue. Si la même réponse contient aussi un
+fait exploitable, par exemple une échéance ou une action immédiate, le LLM reste
+appelé afin de proposer au plus une correction confirmable.
+
 La dernière question miroir dispose du même garde-fou conservateur. Lorsque ses
 options sont exactement « Un vrai problème », « Rien de grave, en fait » et
 « Je ne sais pas », une conséquence explicitement mortelle, vitale ou grave est
@@ -1478,7 +1485,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 224 tests automatisés passent localement dans le dépôt source
+**État tests** : 225 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

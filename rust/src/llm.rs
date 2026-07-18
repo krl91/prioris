@@ -255,6 +255,15 @@ impl LlmService {
                 outcome: ChallengeOutcome::NoChange,
             });
         }
+        if contests_premise(answer) && !has_scorable_challenge_fact(answer) {
+            return Ok(ChallengeCorrection {
+                axis: None,
+                value: 0,
+                uncertainty: Uncertainty::Certain,
+                reason: "La réponse rejette explicitement la prémisse de la question ; aucune correction factuelle d'axe n'est requise.".to_owned(),
+                outcome: ChallengeOutcome::PremiseFalse,
+            });
+        }
         let value = self.raw_json_chat(
             CHALLENGE_ANSWER_SYSTEM,
             &json!({
@@ -720,14 +729,53 @@ fn contests_premise(answer: &str) -> bool {
         "prémisse fausse",
         "question fausse",
         "information fausse",
+        "information est fausse",
+        "comporte une information fausse",
+        "contient une information fausse",
         "hypothese fausse",
         "hypothèse fausse",
+        "premise is false",
+        "question is false",
+        "contains false information",
         "ce n est pas vrai",
         "c est faux",
         "au contraire",
     ]
     .iter()
     .any(|phrase| normalized.contains(phrase))
+}
+
+fn has_scorable_challenge_fact(answer: &str) -> bool {
+    let normalized = normalize_short_text(answer);
+    [
+        "deadline",
+        "echeance",
+        "échéance",
+        "retard",
+        "ce soir",
+        "demain",
+        "aujourd hui",
+        "dois agir",
+        "faut agir",
+        "agir maintenant",
+        "action immediate",
+        "action immédiate",
+        "immediatement",
+        "immédiatement",
+        "bloque",
+        "attend",
+        "depend",
+        "dépend",
+        "impact",
+        "important",
+        "objectif",
+        "consequence",
+        "conséquence",
+        "irreversible",
+        "irréversible",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
 }
 
 fn binary_answer(answer: &str) -> Option<bool> {
@@ -1024,6 +1072,7 @@ mod tests {
     fn challenge_false_premise_is_valid_without_axis_correction() {
         let config = LlmConfig {
             enabled: true,
+            provider: "provider-that-must-not-run".to_owned(),
             ..LlmConfig::default()
         };
         let llm = LlmService::new(config);

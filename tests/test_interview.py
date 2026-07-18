@@ -30,7 +30,7 @@ def run_until(session, answers, mirror_choice=0):
 
 
 EXPRESS_ANSWERS = {
-    Q.SUBJECTIVE: "P3", Q.INACTION: 1, Q.BLOCAGE: 0, Q.CDR: 1,
+    Q.SUBJECTIVE: "P3", Q.IMPACT: 1, Q.INACTION: 1, Q.BLOCAGE: 0, Q.CDR: 1,
     Q.OBJECTIF: 0, Q.ESTIMATION: Estimation.M30_60,
 }
 FULL_ANSWERS = {**EXPRESS_ANSWERS, Q.IMPACT: 1, Q.HORIZON: 1,
@@ -38,7 +38,7 @@ FULL_ANSWERS = {**EXPRESS_ANSWERS, Q.IMPACT: 1, Q.HORIZON: 1,
                 Q.VISIBILITE: 0, Q.PRESSION: 0}
 
 
-def test_express_par_defaut_6_questions():
+def test_express_demande_impact_explicitement():
     asked, s = run_until(Session(), EXPRESS_ANSWERS)
     # INA=1 rend la sonde miroir M1 applicable : elle clôt l'entretien (§7.2)
     assert asked == itv.EXPRESS_FLOW + [Q.MIROIR]
@@ -81,12 +81,13 @@ def test_plafond_2_clarifications():
 
 
 def test_final_axes_defauts_express():
-    """§3.5 : HOR dérivé de la deadline, IRR=1, IMP=min(INA,3)."""
+    """HOR est dérivé, IRR reste neutre et IMP vient de la réponse."""
     _, s = run_until(Session(deadline_days=20), {
         **EXPRESS_ANSWERS, Q.INACTION: 2})
     axes, par_defaut = itv.final_axes(s)
     assert axes[Axis.HOR] == 2 and Axis.HOR in par_defaut
-    assert axes[Axis.IRR] == 1 and axes[Axis.IMP] == 2
+    assert axes[Axis.IRR] == 1 and axes[Axis.IMP] == 1
+    assert Axis.IMP not in par_defaut
     assert Axis.INA not in par_defaut    # répondu, pas défaut
 
 

@@ -51,7 +51,7 @@ def test_plancher_irreversibilite():
 
 
 def test_plancher_objectifs():
-    r = score(axes(aln=3), estimation=Estimation.LT15)
+    r = score(axes(aln=3, imp=2), estimation=Estimation.LT15)
     assert r.importance >= 55.0
     assert r.priorite in (Priorite.P1, Priorite.P2)  # jamais P3/P4 (§6.2)
 
@@ -61,6 +61,13 @@ def test_plancher_objectifs_sans_effet_si_deja_haut():
               estimation=Estimation.M30_60)
     assert not any(a["regle"] == "plancher_objectifs"
                    for a in r.justification["ajustements"])
+
+
+def test_alignement_seul_ne_force_pas_un_quadrant_important():
+    r = score(axes(aln=3), estimation=Estimation.LT15)
+    assert r.importance < 50
+    assert any(a["regle"] == "garde_fou_objectifs"
+               for a in r.justification["ajustements"])
 
 
 # ------------------------------------------------------------- propriétés
@@ -101,9 +108,38 @@ def test_estimation_inconnue_provisoire():
 
 
 def test_pepite():
-    r = score(axes(imp=3, ina=2, aln=2), estimation=Estimation.M30_60)
-    assert r.importance >= 45 and r.pepite
-    assert not score(axes(imp=3, ina=2, aln=2), estimation=Estimation.H2_4).pepite
+    r = score(axes(imp=4, ina=2, aln=2), estimation=Estimation.M30_60)
+    assert r.importance >= 50 and r.pepite
+    assert not score(axes(imp=4, ina=2, aln=2), estimation=Estimation.H2_4).pepite
+
+
+def test_tache_strategique_reste_importante_meme_si_inaction_faible():
+    r = score(axes(imp=4, ina=0, irr=1, aln=2), estimation=Estimation.H1_2)
+    assert r.importance >= 50
+    assert r.priorite == Priorite.P2
+
+
+def test_quadrant_robuste_malgre_hesitation_loin_du_seuil():
+    r = score(axes(imp=4, ina=4, irr=3, aln=3), Estimation.H1_2,
+              incertitudes={Axis.IMP: Incertitude.HESITANT})
+    assert r.robuste
+    assert r.quadrants_possibles == ("Q2",)
+
+
+def test_quadrant_sensible_identifie_axe_pivot():
+    r = score(axes(imp=2, ina=2, irr=1, aln=1), Estimation.H1_2,
+              incertitudes={Axis.IMP: Incertitude.HESITANT})
+    assert not r.robuste
+    assert set(r.quadrants_possibles) == {"Q2", "Q4"}
+    assert r.axe_pivot == "IMP"
+    assert r.provisoire
+
+
+def test_ancien_impact_derive_est_explicitement_non_robuste():
+    r = score(axes(imp=2, ina=0, aln=3), Estimation.H1_2,
+              axes_par_defaut={Axis.IMP})
+    assert not r.robuste
+    assert r.axe_pivot == "IMP"
 
 
 def test_hors_echelle():

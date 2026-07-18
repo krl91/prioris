@@ -12,11 +12,11 @@ use crate::{
     core::{Axis, Uncertainty},
 };
 
-const INTERPRETER_SYSTEM: &str = "PRIORIS_INTERPRETER";
-const QUESTION_SYSTEM: &str = "PRIORIS_QUESTION";
-const CHALLENGE_SYSTEM: &str = "PRIORIS_CHALLENGE";
-const CHALLENGE_ANSWER_SYSTEM: &str = "PRIORIS_CHALLENGE_ANSWER";
-const IMPACT_SYSTEM: &str = "PRIORIS_IMPACT";
+const INTERPRETER_SYSTEM: &str = "PRIORIS_INTERPRETER: Map the free answer to the supplied scale. Never calculate priority. Return only JSON with valeur, incertitude, reformulation, status (ok or abstain), confidence (0..1). Abstain when evidence is insufficient.";
+const QUESTION_SYSTEM: &str = "PRIORIS_QUESTION: Select exactly one supplied option from the free answer. Never calculate priority. Return only JSON with value, incertitude, reformulation, status, confidence. Abstain when no option is supported.";
+const CHALLENGE_SYSTEM: &str = "PRIORIS_CHALLENGE: Return exactly three short questions, one per future turn, that test deadline reality, social pressure or visibility, avoidance, and missing evidence behind the instinctive quadrant. Return only JSON with questions, status, confidence.";
+const CHALLENGE_ANSWER_SYSTEM: &str = "PRIORIS_CHALLENGE_ANSWER: Interpret one answer as at most one factual axis correction. Never calculate priority. Return only JSON with axis, value, uncertainty, reason, status, confidence. Use axis null and abstain without concrete evidence.";
+const IMPACT_SYSTEM: &str = "PRIORIS_IMPACT: Independently classify only the shortlisted task ids against the information. Never invent another id or calculate priority. If none matches, impacted is empty and propose a concise new task. Extract an explicit deadline as YYYY-MM-DD and answer direct questions briefly. Return only JSON with impacted, new_task_title, suggested_deadline, direct_answer, explanation, status, confidence.";
 
 #[derive(Debug, Error)]
 pub enum LlmError {
@@ -32,6 +32,8 @@ pub enum LlmError {
     InvalidResponse(String),
     #[error("embedded inference failed: {0}")]
     Inference(String),
+    #[error("the model abstained or confidence was too low")]
+    Abstained,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -263,12 +265,13 @@ impl LlmService {
         tasks: &[(i64, String)],
         information: &str,
     ) -> Result<ImpactProposal, LlmError> {
+        let candidates = shortlist_tasks(tasks, information, 5);
         let value = self.json_chat(IMPACT_SYSTEM, &json!({
             "date_du_jour": chrono::Local::now().date_naive().to_string(),
             "information": information,
-            "taches_existantes": tasks.iter().map(|(id, title)| json!({"id": id, "titre": title})).collect::<Vec<_>>(),
+            "taches_existantes": candidates.iter().map(|(id, title)| json!({"id": id, "titre": title})).collect::<Vec<_>>(),
         }))?;
-        let valid_ids = tasks
+        let valid_ids = candidates
             .iter()
             .map(|(id, _)| *id)
             .collect::<std::collections::HashSet<_>>();
@@ -276,14 +279,21 @@ impl LlmService {
             .as_array()
             .into_iter()
             .flatten()
-            .filter_map(|item| {
-                let id = item["id"].as_i64()?;
-                valid_ids.contains(&id).then(|| ImpactedTask {
+            .map(|item| {
+                let id = item["id"]
+                    .as_i64()
+                    .ok_or_else(|| LlmError::InvalidResponse("missing impacted id".to_owned()))?;
+                if !valid_ids.contains(&id) {
+                    return Err(LlmError::InvalidResponse(format!(
+                        "impacted id {id} is outside the shortlist"
+                    )));
+                }
+                Ok(ImpactedTask {
                     id,
                     impact: item["impact"].as_str().unwrap_or_default().to_owned(),
                 })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(ImpactProposal {
             impacted,
             new_task_title: value["new_task_title"]
@@ -307,7 +317,9 @@ impl LlmService {
 
     fn json_chat(&self, system: &str, payload: &Value) -> Result<Value, LlmError> {
         let text = self.chat(system, &payload.to_string())?;
-        extract_json(&text)
+        let value = extract_json(&text)?;
+        ensure_confident(&value)?;
+        Ok(value)
     }
 
     fn chat(&self, system: &str, user: &str) -> Result<String, LlmError> {
@@ -355,7 +367,7 @@ impl LlmService {
         let payload = json!({
             "model": self.config.model.to_string_lossy(),
             "temperature": 0,
-            "max_tokens": self.config.max_tokens,
+            "max_tokens": token_budget(system, self.config.max_tokens),
             "messages": [{"role":"system","content":system},{"role":"user","content":user}],
             "response_format": {"type":"json_object"},
         });
@@ -380,7 +392,7 @@ impl LlmService {
         };
         let payload = json!({
             "model": self.config.model.to_string_lossy(),
-            "max_tokens": self.config.max_tokens,
+            "max_tokens": token_budget(system, self.config.max_tokens),
             "temperature": 0,
             "system": system,
             "messages": [{"role":"user","content":user}],
@@ -410,7 +422,9 @@ impl LlmService {
 
     #[cfg(feature = "embedded-llm")]
     fn embedded_chat(&self, system: &str, user: &str) -> Result<String, LlmError> {
-        use mistralrs::{DeviceMapSetting, GgufModelBuilder, RequestBuilder, TextMessageRole};
+        use mistralrs::{
+            Constraint, DeviceMapSetting, GgufModelBuilder, RequestBuilder, TextMessageRole,
+        };
 
         let model_path = &self.config.model;
         if !model_path.is_file() {
@@ -444,13 +458,9 @@ impl LlmService {
             .map_err(|error| LlmError::Inference(error.to_string()))?;
             *guard = Some(model);
         }
-        let max_tokens = if system == "PRIORIS_HEALTH" {
-            8
-        } else {
-            self.config.max_tokens
-        };
         let messages = RequestBuilder::new()
-            .set_sampler_max_len(max_tokens)
+            .set_constraint(Constraint::JsonSchema(schema_for(system)))
+            .set_sampler_max_len(token_budget(system, self.config.max_tokens))
             .add_message(TextMessageRole::System, system)
             .add_message(TextMessageRole::User, user);
         let future = guard
@@ -503,6 +513,159 @@ impl LlmService {
             *error = value;
         }
     }
+}
+
+fn token_budget(system: &str, configured: usize) -> usize {
+    let budget = if system == "PRIORIS_HEALTH" {
+        8
+    } else if system == INTERPRETER_SYSTEM || system == QUESTION_SYSTEM {
+        96
+    } else if system == CHALLENGE_ANSWER_SYSTEM {
+        128
+    } else if system == CHALLENGE_SYSTEM {
+        192
+    } else if system == IMPACT_SYSTEM {
+        320
+    } else {
+        128
+    };
+    configured.min(budget)
+}
+
+#[cfg(feature = "embedded-llm")]
+fn schema_for(system: &str) -> Value {
+    let confidence = json!({"type": "number", "minimum": 0, "maximum": 1});
+    let status = json!({"type": "string", "enum": ["ok", "abstain"]});
+    let (properties, required) = if system == "PRIORIS_HEALTH" {
+        (json!({"pong": {"type": "boolean"}}), vec!["pong"])
+    } else if system == INTERPRETER_SYSTEM {
+        (
+            json!({
+                "valeur": {"type": "integer", "minimum": 0, "maximum": 5},
+                "incertitude": {"type": "integer", "minimum": 0, "maximum": 2},
+                "reformulation": {"type": "string"}, "status": status,
+                "confidence": confidence
+            }),
+            vec![
+                "valeur",
+                "incertitude",
+                "reformulation",
+                "status",
+                "confidence",
+            ],
+        )
+    } else if system == QUESTION_SYSTEM {
+        (
+            json!({
+                "value": {"type": "string"},
+                "incertitude": {"type": "integer", "minimum": 0, "maximum": 2},
+                "reformulation": {"type": "string"}, "status": status,
+                "confidence": confidence
+            }),
+            vec![
+                "value",
+                "incertitude",
+                "reformulation",
+                "status",
+                "confidence",
+            ],
+        )
+    } else if system == CHALLENGE_SYSTEM {
+        (
+            json!({
+                "questions": {"type": "array", "minItems": 3, "maxItems": 3,
+                              "items": {"type": "string"}},
+                "status": status, "confidence": confidence
+            }),
+            vec!["questions", "status", "confidence"],
+        )
+    } else if system == CHALLENGE_ANSWER_SYSTEM {
+        (
+            json!({
+                "axis": {"type": ["string", "null"]},
+                "value": {"type": "integer", "minimum": 0, "maximum": 5},
+                "uncertainty": {"type": "integer", "minimum": 0, "maximum": 2},
+                "reason": {"type": "string"}, "status": status,
+                "confidence": confidence
+            }),
+            vec![
+                "axis",
+                "value",
+                "uncertainty",
+                "reason",
+                "status",
+                "confidence",
+            ],
+        )
+    } else {
+        (
+            json!({
+                "impacted": {"type": "array", "items": {"type": "object",
+                    "properties": {"id": {"type": "integer"}, "impact": {"type": "string"}},
+                    "required": ["id", "impact"], "additionalProperties": false}},
+                "new_task_title": {"type": "string"},
+                "suggested_deadline": {"type": "string"},
+                "direct_answer": {"type": "string"},
+                "explanation": {"type": "string"}, "status": status,
+                "confidence": confidence
+            }),
+            vec![
+                "impacted",
+                "new_task_title",
+                "suggested_deadline",
+                "direct_answer",
+                "explanation",
+                "status",
+                "confidence",
+            ],
+        )
+    };
+    json!({
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": false
+    })
+}
+
+fn ensure_confident(value: &Value) -> Result<(), LlmError> {
+    if value["status"].as_str() == Some("abstain")
+        || value["confidence"]
+            .as_f64()
+            .is_some_and(|score| score < 0.55)
+    {
+        return Err(LlmError::Abstained);
+    }
+    Ok(())
+}
+
+fn shortlist_tasks(tasks: &[(i64, String)], information: &str, limit: usize) -> Vec<(i64, String)> {
+    const STOPWORDS: &[&str] = &[
+        "avec", "cette", "dans", "des", "doit", "elle", "est", "faire", "les", "pour", "que",
+        "qui", "sur", "une", "the", "this", "that", "with", "from", "task",
+    ];
+    let tokenize = |text: &str| {
+        text.to_lowercase()
+            .split(|character: char| !character.is_alphanumeric())
+            .filter(|token| token.chars().count() >= 3 && !STOPWORDS.contains(token))
+            .map(str::to_owned)
+            .collect::<std::collections::HashSet<_>>()
+    };
+    let note_tokens = tokenize(information);
+    let mut ranked = tasks
+        .iter()
+        .filter_map(|(id, title)| {
+            let title_tokens = tokenize(title);
+            let overlap = note_tokens.intersection(&title_tokens).count();
+            (overlap > 0).then_some((overlap, *id, title.clone()))
+        })
+        .collect::<Vec<_>>();
+    ranked.sort_by_key(|(overlap, id, _)| (std::cmp::Reverse(*overlap), *id));
+    ranked
+        .into_iter()
+        .take(limit)
+        .map(|(_, id, title)| (id, title))
+        .collect()
 }
 
 fn uncertainty(value: u64) -> Uncertainty {

@@ -1,6 +1,6 @@
 [project]
 name = "prioris"
-version = "0.4.14"
+version = "0.5.0"
 description = "Assistant personnel d'aide à la décision — MVP (scoring déterministe, Telegram, SQLite, export Obsidian)"
 requires-python = ">=3.11"
 dependencies = [

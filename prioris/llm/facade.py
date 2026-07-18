@@ -18,6 +18,7 @@ from typing import Callable
 from ..core.axes import AXIS_MAX, Axis
 from . import prompts
 from .client import ChatClient, LLMError
+from .shortlist import shortlist_tasks
 
 MAX_ATTEMPTS = 2
 
@@ -52,6 +53,7 @@ def _extract_json(text: str) -> dict:
 
 
 def _validate(axis: Axis, data: dict) -> InterpretedAnswer:
+    _require_confidence(data)
     valeur = data["valeur"]
     incertitude = data.get("incertitude", 0)
     reformulation = str(data.get("reformulation", "")).strip()
@@ -64,6 +66,20 @@ def _validate(axis: Axis, data: dict) -> InterpretedAnswer:
     if not reformulation:
         raise ValueError("reformulation vide")
     return InterpretedAnswer(axis, valeur, int(incertitude), reformulation)
+
+
+def _require_confidence(data: dict, minimum: float = 0.55) -> None:
+    """Reject explicit abstention or a low-confidence model proposal."""
+    status = str(data.get("status", "ok")).lower()
+    confidence = data.get("confidence", 1.0)
+    if status == "abstain":
+        raise ValueError("le LLM s'abstient")
+    if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+        raise ValueError("confidence invalide")
+    if not 0 <= float(confidence) <= 1:
+        raise ValueError("confidence hors intervalle 0..1")
+    if float(confidence) < minimum:
+        raise ValueError(f"confiance insuffisante : {confidence}")
 
 
 class LLMFacade:
@@ -94,7 +110,8 @@ class LLMFacade:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.INTERVIEWER_SYSTEM, payload)
+                raw = self._client.chat(prompts.INTERVIEWER_SYSTEM, payload,
+                                        max_tokens=96)
                 result = _validate(axis, _extract_json(raw))
             except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
                 self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
@@ -123,8 +140,10 @@ class LLMFacade:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.QUESTION_INTERPRETER_SYSTEM, payload)
+                raw = self._client.chat(prompts.QUESTION_INTERPRETER_SYSTEM, payload,
+                                        max_tokens=96)
                 data = _extract_json(raw)
+                _require_confidence(data)
                 value = str(data["value"]).strip()
                 incertitude = data.get("incertitude", 0)
                 reformulation = str(data.get("reformulation", "")).strip()
@@ -164,8 +183,11 @@ class LLMFacade:
         for _ in range(MAX_ATTEMPTS):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.GOAL_MATCH_SYSTEM, payload)
-                gid = _extract_json(raw).get("goal_id")
+                raw = self._client.chat(prompts.GOAL_MATCH_SYSTEM, payload,
+                                        max_tokens=32)
+                data = _extract_json(raw)
+                _require_confidence(data)
+                gid = data.get("goal_id")
                 if gid is not None and (not isinstance(gid, int)
                                         or gid not in valid_ids):
                     raise ValueError(f"goal_id invalide : {gid!r}")
@@ -192,8 +214,11 @@ class LLMFacade:
         for _ in range(MAX_ATTEMPTS):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.GOAL_AUDIT_SYSTEM, payload)
-                douteuses = _extract_json(raw).get("douteuses", [])
+                raw = self._client.chat(prompts.GOAL_AUDIT_SYSTEM, payload,
+                                        max_tokens=192)
+                data = _extract_json(raw)
+                _require_confidence(data)
+                douteuses = data.get("douteuses", [])
                 if not isinstance(douteuses, list):
                     raise ValueError("douteuses n'est pas une liste")
                 result = []
@@ -227,8 +252,10 @@ class LLMFacade:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.TASK_REVISION_SYSTEM, payload)
+                raw = self._client.chat(prompts.TASK_REVISION_SYSTEM, payload,
+                                        max_tokens=256)
                 data = _extract_json(raw)
+                _require_confidence(data)
                 changes = data.get("changes", [])
                 if not isinstance(changes, list):
                     raise ValueError("changes n'est pas une liste")
@@ -275,14 +302,17 @@ class LLMFacade:
         if not self.available:
             self.last_error = "LLM désactivé (enabled = false ou section absente)"
             return None
-        valid_ids = {i for i, _ in tasks}
-        payload = prompts.build_task_impact_payload(tasks, note)
+        candidates = shortlist_tasks(tasks, note)
+        valid_ids = {i for i, _ in candidates}
+        payload = prompts.build_task_impact_payload(candidates, note)
         model = self._client.cfg.model
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.TASK_IMPACT_SYSTEM, payload)
+                raw = self._client.chat(prompts.TASK_IMPACT_SYSTEM, payload,
+                                        max_tokens=320)
                 data = _extract_json(raw)
+                _require_confidence(data)
                 impacted = data.get("impacted", [])
                 if not isinstance(impacted, list):
                     raise ValueError("impacted n'est pas une liste")
@@ -342,8 +372,10 @@ class LLMFacade:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.SUBJECTIVE_CHALLENGE_SYSTEM, payload)
+                raw = self._client.chat(prompts.SUBJECTIVE_CHALLENGE_SYSTEM, payload,
+                                        max_tokens=192)
                 data = _extract_json(raw)
+                _require_confidence(data)
                 questions = data.get("questions")
                 if not isinstance(questions, list) or len(questions) != 3:
                     raise ValueError("questions doit contenir exactement 3 éléments")
@@ -386,8 +418,10 @@ class LLMFacade:
         for attempt in range(1, MAX_ATTEMPTS + 1):
             t0 = time.monotonic()
             try:
-                raw = self._client.chat(prompts.CHALLENGE_ANSWER_SYSTEM, payload)
+                raw = self._client.chat(prompts.CHALLENGE_ANSWER_SYSTEM, payload,
+                                        max_tokens=128)
                 data = _extract_json(raw)
+                _require_confidence(data)
                 axis = data.get("axis")
                 if axis in ("", None, "null"):
                     result = {
@@ -433,7 +467,9 @@ class LLMFacade:
             return False
         t0 = time.monotonic()
         try:
-            self._client.chat("Réponds en JSON.", '{"ping": true} → réponds {"pong": true}')
+            self._client.chat("Réponds en JSON.",
+                              '{"ping": true} → réponds {"pong": true}',
+                              max_tokens=16)
             self._log("warmup", self._client.cfg.model,
                       int((time.monotonic() - t0) * 1000), True)
             self.last_error = None

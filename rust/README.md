@@ -11,11 +11,11 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.1.1 |
+| Système | Archive Rust 0.2.0 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.1.1-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.1.1-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.1.1-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.2.0-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.2.0-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.2.0-linux-x64.tar.gz` |
 
 Décompresse l'archive puis lance `scripts/run.sh` sous macOS/Linux ou
 `scripts/run.ps1` sous Windows. Le modèle Ministral 3B, `config.toml` et
@@ -24,7 +24,7 @@ de vérifier l'intégrité de l'archive.
 
 ## État fonctionnel
 
-Cette première version fournit :
+La version Rust fournit :
 
 - la GUI native locale ;
 - Telegram optionnel en long polling, sans webhook entrant, exécuté en
@@ -32,6 +32,8 @@ Cette première version fournit :
 - la modification et la sauvegarde de `config.toml` depuis la GUI ;
 - le même schéma SQLite que la version Python ;
 - le scoring déterministe P1-P4 et le plan du jour avec dates et énergie ;
+- l'algorithme v2 avec `IMP` explicite en express, intervalles de robustesse,
+  quadrants possibles et axe pivot ;
 - un entretien qui affiche et attend une seule question à la fois ;
 - les réponses libres LLM avec proposition avant validation dans la GUI ;
 - trois questions anti-biais LLM posées successivement et intégrées au calcul
@@ -41,8 +43,10 @@ Cette première version fournit :
 - le scan, l'annotation et l'export Markdown Obsidian ;
 - les modes sans LLM, interpréteur intégré, GGUF embarqué, Ollama, LM Studio,
   OpenAI-compatible, Anthropic et GitHub Copilot.
+- la génération JSON contrainte par schéma pour le GGUF embarqué, les budgets
+  de tokens par appel, l'abstention explicite et la présélection `/info`.
 
-Limites de cette première tranche par rapport à la version Python 0.4.14 :
+Limites actuelles par rapport à la version Python 0.5.0 :
 
 - Telegram utilise des réponses numérotées et ne propose pas encore les mêmes
   boutons de confirmation que la GUI ;
@@ -171,7 +175,8 @@ d'abord et sans planifier les P4 ni les estimations inconnues. Les questions,
 ```
 
 Le premier test vérifie le binaire, SQLite et le scoring. Le second charge
-réellement le GGUF et effectue une génération bornée à huit tokens.
+réellement le GGUF, vérifie le schéma JSON de santé, puis interprète une réponse
+`IMP` structurée avec validation de l'échelle et de la confiance.
 
 ## Note sur « 100 % Rust »
 

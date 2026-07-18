@@ -372,7 +372,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `205 passed`.
+Résultat attendu : `214 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,7 +391,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `205 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `214 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.6 Rappels pour Obsidian et Windows
@@ -836,6 +836,23 @@ d'entrer dans le calcul. Sortie invalide 2 fois → repli boutons avec diagnosti
 visible (`/llm` ou bouton **LLM**). Pour `/info`, un échec LLM réel est affiché
 comme une erreur d'analyse, pas comme « aucune modification proposée ».
 
+Les appels utilisent une température nulle et un budget de sortie adapté :
+environ 96 tokens pour interpréter un axe/choix, 128 pour une réponse de
+challenge, 192 pour générer les trois challenges et 320 pour `/info`, toujours
+bornés par `max_tokens`. Le modèle peut répondre `status="abstain"`; une
+confiance inférieure à `0,55` ou une abstention déclenche le repli manuel au
+lieu d'inventer une valeur. Les quelques exemples inclus dans les prompts
+montrent notamment « je ne sais pas » et « aucune candidate ne correspond ».
+
+Dans la version Rust avec GGUF embarqué, `mistral.rs` contraint directement les
+tokens générés avec un schéma JSON et garde le modèle chargé dans le processus.
+Dans la version Python autonome, `llama-simple` reste un binaire CLI/stdout sans
+serveur : il est relancé par appel et ne fournit pas l'option de grammaire de
+`llama-cli`; PRIORIS compense par prompt strict, validation, abstention et deux
+tentatives. Les endpoints compatibles utilisent `response_format` lorsqu'ils
+le supportent. Aucun de ces mécanismes ne donne au LLM le droit de calculer ou
+d'écrire une priorité.
+
 ### 1.10 Sauvegarde
 
 Tout l'état vit dans **un seul fichier** : `prioris.db`. Une copie datée
@@ -880,6 +897,7 @@ Toi : /add Préparer l'atelier projet de jeudi
 Bot : Catégorie ?                     [Travail] [Carrière] [Santé] …
 Bot : Cette tâche a-t-elle une date limite de résolution ?
 Bot : Instinctivement, tu la classes comment ?   [P1] [P2] [P3] [P4]
+Bot : Quelle différence réelle entre « fait » et « pas fait » ?
 Bot : Si personne n'y touche pendant un mois… ?  [Aucune] [Gêne] …
 Bot : Qui est bloqué si ce n'est pas fait cette semaine ?
 Bot : Comment le coût évolue-t-il si tu attends ?
@@ -901,7 +919,7 @@ Points clés :
   coût du retard est une falaise. Si la date est floue, choisis **Aucune date
   limite** plutôt que d'inventer.
 - **L'entretien s'allonge tout seul quand il le faut** (P1 instinctif,
-  conséquence grave, deadline < 7 j, contradiction) : 6 questions deviennent
+  conséquence grave, deadline < 7 j, contradiction) : 7 questions deviennent
   13. C'est voulu : une tâche à enjeu mérite ses questions.
 - **Si le bot signale une contradiction** (⚠️), il pose une question de
   clarification avec 3 choix. Réponds honnêtement : la correction s'applique
@@ -987,8 +1005,13 @@ Si tu reçois une information nouvelle, utilise d'abord le mode global :
 /info La deadline réelle est vendredi et après ce sera trop tard
 ```
 
-Le LLM cherche les tâches existantes potentiellement impactées et propose une
-liste d'ids avec une explication tâche par tâche. Cette liste est une proposition :
+PRIORIS effectue d'abord une présélection locale déterministe de **cinq tâches
+maximum** : texte normalisé, mots significatifs communs, puis ordre stable par
+pertinence et id. Le LLM ne reçoit que ces candidates et doit classer chacune
+indépendamment ; tout id extérieur est rejeté. Si la présélection est vide, il
+doit proposer une nouvelle tâche. Cette approche réduit le contexte et les faux
+rapprochements sans embarquer un second modèle d'embeddings. Le LLM propose
+ensuite une liste d'ids avec une explication tâche par tâche. Cette liste est une proposition :
 tu peux choisir seulement certaines tâches, ou cibler directement une tâche avec :
 
 ```bash
@@ -1121,7 +1144,7 @@ plancher déterministe décrit plus bas. Le LLM ne fournit jamais directement
 
 | Axe | Rattaché à | Question factuelle et échelle complète | Exemple chiffré |
 |---|---|---|---|
-| `BLK` blocage réel, `0..5` | Urgence, poids 30 | « Qui est bloqué si ce n'est pas fait cette semaine ? » `0` personne ; `1` moi seul ; `2` une autre personne ; `3` une équipe ; `4` le client ; `5` plusieurs équipes. | Un client réellement empêché d'avancer donne `BLK=4`, donc `30×4/5 = 24` points d'urgence. Une personne seulement en attente n'est pas forcément bloquée. |
+| `BLK` blocage réel, `0..5` | Urgence, poids 30 | « Qui est bloqué si ce n'est pas fait cette semaine ? » `0` personne ; `1` moi seul ; `2` une autre personne ; `3` une équipe ou plusieurs personnes ; `4` un acteur critique ; `5` plusieurs équipes ou une chaîne critique. | Un acteur critique réellement empêché d'avancer donne `BLK=4`, donc `30×4/5 = 24` points d'urgence. L'échelle combine étendue et criticité : une personne seulement en attente n'est pas forcément bloquée. |
 | `CDR` coût du retard, `0..4` | Urgence, poids 40 | « Comment le coût évolue-t-il si tu attends ? » `0` rien ; `1` accumulation douce ; `2` nette ; `3` aggravation croissante ; `4` falaise à une date. | Un dépôt impossible après vendredi donne `CDR=4`, soit `40×4/4 = 40` points d'urgence. |
 | `HOR` horizon, `0..4` | Urgence, poids 30 | « Quand le problème deviendra-t-il visible ? » `0` jamais ; `1` dans plus d'un mois ; `2` dans 2 à 4 semaines ; `3` cette semaine ; `4` déjà visible. | Une conséquence visible cette semaine donne `HOR=3`, soit `30×3/4 = 22,5` points d'urgence. |
 | `IMP` impact, `0..4` | Importance, poids 35 | `Quelle différence réelle entre « fait » et « pas fait » ?` `0` négligeable ; `1` confort ; `2` notable ; `3` majeure ; `4` structurante. | Une certification qui change réellement l'accès à un poste peut donner `IMP=3`, soit `35×3/4 = 26,25` points d'importance. |
@@ -1130,18 +1153,34 @@ plancher déterministe décrit plus bas. Le LLM ne fournit jamais directement
 | `ALN` alignement objectif, `0..3` | Importance, poids 20 | « Cette tâche contribue-t-elle à un de tes objectifs de vie ? » `0` aucun ; `1` indirecte ; `2` directe ; `3` majeure. | Préparer l'examen décisif d'un objectif actif peut donner `ALN=3`, soit 20 points et le plancher d'importance décrit plus bas. |
 
 **Entretien express et valeurs dérivées.** Le flux express demande le
-classement instinctif, `INA`, `BLK`, `CDR`, `ALN` et l'estimation. S'il ne
-bascule pas en mode complet, les axes non demandés sont remplis de façon
-déterministe : `IMP = min(INA, 3)`, `IRR = 1`, et `HOR` vient de la date limite :
+classement instinctif, puis `IMP`, `INA`, `BLK`, `CDR`, `ALN` et l'estimation,
+une question et une réponse à la fois. `IMP` est toujours explicite : l'impact
+positif d'une action et le dommage d'un mois d'inaction sont deux critères
+indépendants. S'il ne bascule pas en mode complet, seuls `IRR = 1` et `HOR`
+sont dérivés. `HOR` vient de la date limite :
 `4` si elle est échue ou aujourd'hui, `3` à 1-7 jours, `2` à 8-30 jours,
 `1` au-delà de 30 jours, ou la médiane `2` sans date. Ces valeurs sont marquées
 « par défaut » dans la justification. Le mode complet demande explicitement
-`IMP`, `HOR` et `IRR`, puis l'effort et les métadonnées de biais.
+`HOR` et `IRR`, puis l'effort et les métadonnées de biais.
 
-**Incertitude.** « Je ne sais pas » ne vaut pas zéro. La valeur est remplacée
-par la médiane conservatrice de l'axe : `BLK=2`, `CDR=2`, `HOR=2`, `IMP=2`,
-`INA=2`, `IRR=1`, `ALN=1`. L'évaluation devient provisoire. Une simple
-hésitation est enregistrée, mais ne remplace pas la valeur confirmée.
+**Incertitude et robustesse.** « Je ne sais pas » ne vaut pas zéro. Le score
+central utilise la médiane conservatrice : `BLK=2`, `CDR=2`, `HOR=2`, `IMP=2`,
+`INA=2`, `IRR=1`, `ALN=1`. En parallèle, l'algorithme v2 calcule un intervalle :
+
+- réponse certaine `v` : `[v, v]` ;
+- réponse hésitante `v` : `[max(0,v-1), min(max_axe,v+1)]` ;
+- réponse inconnue : `[médiane-1, médiane+1]`, borné par l'échelle ;
+- ancien dossier où `IMP` avait été dérivé : intervalle strict `[0,4]`.
+
+Les coins bas et haut sont recalculés avec les mêmes poids et planchers. Si
+l'intervalle de `U` traverse 55 ou celui de `I` traverse 50, le quadrant est
+**sensible** et l'évaluation provisoire. PRIORIS liste tous les quadrants
+possibles et nomme comme **axe pivot** l'axe incertain dont l'amplitude pondérée
+`poids × (haut-bas) / maximum` est la plus forte sur le seuil traversé.
+Exemple : `IMP=2` hésitant donne `[1,3]`, soit une amplitude de
+`35×2/4=17,5` points d'importance. Si `I` varie alors de 42 à 59, Q4 et Q2
+sont possibles et `IMP` est l'axe à clarifier en premier. Si aucun seuil n'est
+traversé, le quadrant est robuste même si une réponse était hésitante.
 
 **Paramètres qui ne rentrent pas directement dans le score.**
 
@@ -1171,9 +1210,10 @@ ordre :
 
 1. date limite à 7 jours ou moins **et** `CDR=4` : `U = max(U, 70)` ;
 2. `IRR=3` **et** `INA>=3` : `I = max(I, 70)` ;
-3. `ALN=3` : `I = max(I, 55)`.
+3. `ALN=3` **et** (`IMP>=2` ou `INA>=2`) : `I = max(I, 55)`.
 
-Ces planchers ne rajoutent pas 70 points : ils remontent seulement un total
+Le troisième garde-fou empêche un simple alignement déclaré de forcer P2 sans
+impact ni conséquence d'inaction mesurable. Ces planchers ne rajoutent pas 70 points : ils remontent seulement un total
 inférieur au seuil indiqué. Le JSON de justification conserve les termes avant
 plancher et chaque ajustement avant/après.
 
@@ -1198,7 +1238,7 @@ G = 0,6×65,42 + 0,4×43,5 = 56,65
 
 `U < 55` et `I >= 50` donnent Q2/P2. Aucun plancher ne change ici le résultat,
 car `I` dépasse déjà 55. Avec une estimation connue de 45 minutes, cette tâche
-est aussi une **pépite** : `I >= 45` et durée `<= 60 min`. Son levier affiché
+est aussi une **pépite** : `I >= 50` et durée `<= 60 min`. Son levier affiché
 est `I / max(durée_en_heures, 0,25)`, ici environ `87,2` points d'importance par
 heure. Le levier est informatif ; seul le bonus pépite de 10 intervient dans le
 plan du jour.
@@ -1214,7 +1254,7 @@ plan du jour.
 V = G + bonus_pépite + bonus_échéance + ajustement_énergie
 ```
 
-Le bonus pépite vaut `+10` si `I >= 45`, estimation connue et durée `<= 60 min`.
+Le bonus pépite vaut `+10` si `I >= 50`, estimation connue et durée `<= 60 min`.
 Le bonus d'échéance est borné et dépend du nombre de jours restants :
 
 | Échéance | J<=0 | J<=1 | J<=3 | J<=7 | J<=14 | J<=30 | >30 ou aucune |
@@ -1247,6 +1287,55 @@ L'ajustement d'énergie dépend de l'effort :
 vaut `55+35=90` : elle passe devant. En revanche, une P4 due aujourd'hui reste
 exclue malgré son bonus théorique, car l'éligibilité est vérifiée avant le
 calcul de `V`.
+
+### 2.5.5 Modèles, sensibilité, limites et sources
+
+PRIORIS emploie deux modèles successifs qu'il ne faut pas confondre :
+
+1. **classification** : les seuils de `U` et `I` choisissent Q1-Q4/P1-P4 ;
+2. **ordonnancement** : `G`, puis `V`, départagent les tâches déjà classées et
+   remplissent la capacité du jour.
+
+Ainsi, deux P2 peuvent avoir des `G` différents, mais un grand `G` ne transforme
+jamais une P4 en P2. L'intervalle de robustesse teste la stabilité de la
+classification ; il ne constitue pas une probabilité. Les poids actuels sont
+conservés pour assurer la continuité. Une future calibration doit partir de
+cas réellement observés et d'une **swing weighting** : comparer la valeur d'un
+passage du minimum au maximum de chaque critère, puis tester la sensibilité des
+résultats, comme recommandé par le guide MCDA du gouvernement britannique
+([MCDA, GOV.UK](https://www.gov.uk/government/publications/green-book-supplementary-guidance-multi-criteria-decision-analysis/use-of-multi-criteria-decision-analysis-in-options-appraisal-of-economic-cases)).
+
+Limites à auditer sur les données d'usage :
+
+- `CDR` et `HOR` peuvent décrire une partie du même phénomène temporel. Il faut
+  mesurer leur corrélation avant de réduire un poids ; l'intervalle et l'axe
+  pivot rendent déjà les cas fragiles visibles.
+- `BLK` est ordinal et mélange nombre de personnes et criticité. Les libellés
+  v2 clarifient ce compromis, mais `BLK=4` n'est pas mathématiquement « deux
+  fois » `BLK=2`.
+- le bonus d'échéance du plan, borné à `+40`, est une heuristique distincte du
+  score ; il évite qu'une date proche soit ignorée mais doit être réévalué sur
+  l'historique des plans.
+- les dépendances entre tâches ne sont pas encore modélisées ; `BLK` exprime
+  seulement le blocage courant.
+- la présélection `/info` est lexicale. Des embeddings amélioreraient les
+  synonymes, mais ajouteraient un modèle, du poids disque et une nouvelle
+  chaîne d'inférence offline ; ce choix est donc reporté et explicite.
+
+Références utilisées : le modèle additif pondéré et l'analyse de sensibilité
+s'appuient sur le guide MCDA précité et sur l'étude du JRC consacrée à la
+robustesse des classements sous incertitude
+([JRC, 2013](https://publications.jrc.ec.europa.eu/repository/handle/JRC87397)).
+Le principe « coût du retard divisé par durée » est une référence de comparaison,
+pas la formule de PRIORIS
+([WSJF, Scaled Agile](https://framework.scaledagile.com/wsjf/)). Pour les sorties
+LLM structurées, voir la documentation officielle des grammaires GBNF de
+[llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md),
+les sorties contraintes de
+[mistral.rs](https://github.com/EricLBuehler/mistral.rs) et l'évaluation
+[JSONSchemaBench](https://arxiv.org/abs/2501.10868). Ces sources justifient la
+méthode ; les poids et seuils restent des choix produit versionnés, à calibrer
+sur l'usage de PRIORIS.
 
 ### 2.6 /scan — prioriser les tâches de ton vault (V0.3)
 
@@ -1344,7 +1433,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 205 tests automatisés passent localement dans le dépôt source
+**État tests** : 214 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

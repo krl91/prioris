@@ -17,11 +17,15 @@ Règles absolues :
 
 Format de sortie STRICT :
 {"valeur": <entier de l'échelle>, "incertitude": <0, 1 ou 2>,
- "reformulation": "<une phrase reformulant ce que tu as compris>"}
+ "reformulation": "<une phrase reformulant ce que tu as compris>",
+ "status": "ok|abstain", "confidence": <nombre de 0 à 1>}
 
 Incertitude : 0 = réponse nette ; 1 = hésitation ("je pense", "sans doute",
 "ça dépend", "peut-être") ; 2 = "je ne sais pas" ou réponse hors sujet.
-La reformulation est en français, à la deuxième personne, factuelle."""
+La reformulation est en français, à la deuxième personne, factuelle.
+Si le texte ne permet pas un choix fiable, utilise status="abstain".
+Exemple : réponse « je ne sais vraiment pas » →
+{"valeur": 2, "incertitude": 2, "reformulation": "Tu ne sais pas encore l'évaluer.", "status": "abstain", "confidence": 0.1}."""
 
 QUESTION_INTERPRETER_SYSTEM = """Tu es l'intervieweur d'un assistant de
 priorisation de tâches.
@@ -38,10 +42,12 @@ Règles absolues :
 
 Format :
 {"value": "<value exacte d'une option>", "incertitude": <0, 1 ou 2>,
- "reformulation": "<une phrase factuelle reformulant ce que tu as compris>"}
+ "reformulation": "<une phrase factuelle reformulant ce que tu as compris>",
+ "status": "ok|abstain", "confidence": <nombre de 0 à 1>}
 
 Incertitude : 0 = réponse nette ; 1 = hésitation ; 2 = je ne sais pas,
-réponse trop floue ou hors sujet."""
+réponse trop floue ou hors sujet. Utilise status="abstain" si aucune option
+n'est suffisamment soutenue par la réponse."""
 
 
 GOAL_MATCH_SYSTEM = """Tu relies une tâche à un objectif de vie de l'utilisateur.
@@ -68,7 +74,8 @@ Règles absolues :
 
 Format :
 {"changes": [{"axis": "<code axe>", "value": <entier>, "reason": "<raison courte>"}],
- "explanation": "<ce que tu veux faire, en une ou deux phrases>"}
+ "explanation": "<ce que tu veux faire, en une ou deux phrases>",
+ "status": "ok|abstain", "confidence": <nombre de 0 à 1>}
 
 Axes autorisés :
 BLK = qui est bloqué ; CDR = coût du retard ; HOR = horizon temporel ;
@@ -82,6 +89,8 @@ Règles absolues :
 - Tu ne modifies rien.
 - Tu ne calcules jamais de priorité ni de score.
 - Tu proposes seulement une liste d'id de tâches existantes si le lien est clair.
+- La liste fournie est une présélection déterministe courte : examine chaque
+  candidate indépendamment et ne complète jamais avec un autre id.
 - Si aucune tâche existante ne correspond, mets `"impacted": []` ; ne mets
   jamais `null` comme id.
 - Pour chaque tâche proposée, explique l'impact identifié en une phrase.
@@ -101,7 +110,13 @@ Format :
  "new_task_title": "<titre si aucune tâche impactée, sinon chaîne vide>",
  "suggested_deadline": "<date ISO AAAA-MM-JJ si détectée, sinon chaîne vide>",
  "direct_answer": "<réponse directe courte si l'utilisateur a posé une question, sinon chaîne vide>",
- "explanation": "<résumé court>"}"""
+ "explanation": "<résumé court>", "status": "ok|abstain",
+ "confidence": <nombre de 0 à 1>}
+
+Exemple : information « Paul doit envoyer le devis demain », candidate
+`{"id": 7, "titre": "Finaliser le devis Paul"}` → id 7 impacté et date de
+demain en ISO. Si les candidates parlent d'un autre sujet, `impacted` reste
+vide et `new_task_title` reprend une action concise."""
 
 SUBJECTIVE_CHALLENGE_SYSTEM = """Tu aides l'utilisateur à vérifier son classement
 instinctif d'une tâche dans la matrice urgent/important.
@@ -118,7 +133,9 @@ Règles absolues :
 - Réponds UNIQUEMENT en JSON strict, sans texte autour.
 
 Format :
-{"questions": ["<question 1>", "<question 2>", "<question 3>"]}"""
+{"questions": ["<question 1>", "<question 2>", "<question 3>"],
+ "status": "ok|abstain", "confidence": <nombre de 0 à 1>}
+Utilise status="abstain" si le titre ou le classement manque."""
 
 CHALLENGE_ANSWER_SYSTEM = """Tu interprètes une réponse utilisateur à une
 question de vérification de quadrant urgent/important.
@@ -140,7 +157,10 @@ Règles absolues :
 - Réponds UNIQUEMENT en JSON strict, sans texte autour.
 
 Format :
-{"axis": "CDR|INA|BLK|IMP|HOR|IRR|ALN|null", "value": 0, "uncertainty": 0, "reason": "<raison courte>"}"""
+{"axis": "CDR|INA|BLK|IMP|HOR|IRR|ALN|null", "value": 0,
+ "uncertainty": 0, "reason": "<raison courte>", "status": "ok|abstain",
+ "confidence": <nombre de 0 à 1>}
+Sans fait concret, utilise axis=null et status="abstain"."""
 
 
 def build_goal_match_payload(task_title: str,

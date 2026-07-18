@@ -57,11 +57,50 @@ fn interview_is_strictly_sequential() {
     assert_eq!(session.next_question(), Some(Question::Subjective));
     session.subjective = Some(Priority::P2);
     session.mark_asked(Question::Subjective);
+    assert_eq!(session.next_question(), Some(Question::Impact));
+    session
+        .answer_axis(Question::Impact, 3, Uncertainty::Certain)
+        .unwrap();
     assert_eq!(session.next_question(), Some(Question::Inaction));
     session
         .answer_axis(Question::Inaction, 2, Uncertainty::Certain)
         .unwrap();
     assert_eq!(session.next_question(), Some(Question::Blockage));
+}
+
+#[test]
+fn strategic_impact_is_independent_from_inaction() {
+    let result = score(
+        &axes([0, 0, 4, 1, 0, 0, 2]),
+        Estimate::H1_2,
+        None,
+        &HashMap::new(),
+        &HashSet::new(),
+        "express",
+        None,
+    )
+    .unwrap();
+    assert_eq!(result.priority, Priority::P2);
+    assert!(result.robust);
+}
+
+#[test]
+fn uncertain_impact_reports_pivot_and_possible_quadrants() {
+    let mut uncertainty = HashMap::new();
+    uncertainty.insert(Axis::IMP, Uncertainty::Hesitant);
+    let result = score(
+        &axes([0, 0, 2, 1, 2, 0, 1]),
+        Estimate::H1_2,
+        None,
+        &uncertainty,
+        &HashSet::new(),
+        "express",
+        None,
+    )
+    .unwrap();
+    assert!(!result.robust);
+    assert_eq!(result.pivot_axis.as_deref(), Some("IMP"));
+    assert_eq!(result.possible_quadrants, ["Q2", "Q4"]);
 }
 
 #[test]

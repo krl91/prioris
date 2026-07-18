@@ -960,6 +960,15 @@ fn render_add_flow(
         "Urgence {:.1} · Importance {:.1}",
         result.urgency, result.importance
     ));
+    if result.robust {
+        ui.label(format!("Quadrant robuste : {}", result.quadrant));
+    } else {
+        ui.label(format!(
+            "Quadrant sensible : {} · axe pivot {}",
+            result.possible_quadrants.join(" / "),
+            result.pivot_axis.as_deref().unwrap_or("indéterminé")
+        ));
+    }
     ui.label("Toutes les réponses confirmées, y compris les corrections anti-biais, sont incluses dans ce calcul.");
     ui.horizontal(|ui| {
         if ui.button("Annuler").clicked() {

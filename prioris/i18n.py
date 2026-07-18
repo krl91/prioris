@@ -21,8 +21,9 @@ def normalize_language(value: str | None) -> Language:
 
 AXIS_LABELS_I18N: dict[Language, dict[Axis, list[str]]] = {
     "fr": {
-        Axis.BLK: ["Personne", "Moi seul", "Une autre personne", "Une équipe",
-                   "Le client", "Plusieurs équipes"],
+        Axis.BLK: ["Personne", "Moi seul", "Une autre personne",
+                   "Une équipe ou plusieurs personnes", "Un acteur critique",
+                   "Plusieurs équipes ou une chaîne critique"],
         Axis.CDR: ["Rien — le coût ne bouge pas", "Il s'accumule doucement",
                    "Il s'accumule nettement", "Il s'aggrave de plus en plus",
                    "Falaise : tout se joue à une date"],
@@ -39,8 +40,9 @@ AXIS_LABELS_I18N: dict[Language, dict[Axis, list[str]]] = {
                    "Contribution directe", "Contribution majeure"],
     },
     "en": {
-        Axis.BLK: ["Nobody", "Only me", "One other person", "A team",
-                   "The client", "Several teams"],
+        Axis.BLK: ["Nobody", "Only me", "One other person",
+                   "One team or several people", "A critical stakeholder",
+                   "Several teams or a critical chain"],
         Axis.CDR: ["Nothing, the cost does not change", "It slowly accumulates",
                    "It clearly accumulates", "It keeps getting worse",
                    "Cliff edge: everything depends on a date"],

@@ -100,7 +100,15 @@ fn llm_smoke(model: PathBuf) -> anyhow::Result<()> {
             ..LlmConfig::default()
         });
         let latency = service.health_check()?;
-        println!("PRIORIS Rust embedded LLM: OK ({latency} ms)");
+        let interpreted = service.interpret_axis(
+            prioris::core::Axis::IMP,
+            prioris::core::Axis::IMP.question_fr(),
+            "Une différence majeure et clairement mesurable.",
+        )?;
+        println!(
+            "PRIORIS Rust embedded LLM: OK ({latency} ms, IMP={})",
+            interpreted.value
+        );
         Ok(())
     }
     #[cfg(not(feature = "embedded-llm"))]

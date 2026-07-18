@@ -36,8 +36,9 @@ class Q(str, Enum):
     MIROIR = "MIROIR"
 
 
-EXPRESS_FLOW = [Q.SUBJECTIVE, Q.INACTION, Q.BLOCAGE, Q.CDR, Q.OBJECTIF, Q.ESTIMATION]
-FULL_EXTRA = [Q.IMPACT, Q.HORIZON, Q.IRREVERSIBILITE, Q.EFFORT,
+EXPRESS_FLOW = [Q.SUBJECTIVE, Q.IMPACT, Q.INACTION, Q.BLOCAGE, Q.CDR,
+                Q.OBJECTIF, Q.ESTIMATION]
+FULL_EXTRA = [Q.HORIZON, Q.IRREVERSIBILITE, Q.EFFORT,
               Q.DEMANDEUR, Q.VISIBILITE, Q.PRESSION]
 
 Q_TO_AXIS = {Q.INACTION: Axis.INA, Q.BLOCAGE: Axis.BLK, Q.CDR: Axis.CDR,
@@ -228,7 +229,7 @@ def final_axes(s: Session) -> tuple[dict, set]:
     Returns `(axes, defaulted_axes)`.
     """
     axes = dict(s.axes)
-    defaults = express_defaults(axes.get(Axis.INA, 0), s.deadline_days)
+    defaults = express_defaults(s.deadline_days)
     par_defaut = set()
     for axis, val in defaults.items():
         if axis not in axes:

@@ -242,7 +242,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `205 passed`.
+Expected result: `214 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +261,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `205 passed`.
+Expected result: `214 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -405,7 +405,7 @@ never provides `U`, `I`, `G`, the quadrant, or the priority directly.
 
 | Axis | Feeds | Factual question and complete scale | Worked example |
 |---|---|---|---|
-| `BLK`, actual blockage, `0..5` | Urgency, weight 30 | “Who is blocked if this is not done this week?” `0` nobody; `1` only me; `2` another person; `3` one team; `4` the client; `5` several teams. | A client genuinely unable to proceed gives `BLK=4`, hence `30×4/5 = 24` urgency points. Someone merely waiting is not necessarily blocked. |
+| `BLK`, actual blockage, `0..5` | Urgency, weight 30 | “Who is blocked if this is not done this week?” `0` nobody; `1` only me; `2` another person; `3` one team or several people; `4` a critical stakeholder; `5` several teams or a critical chain. | A critical stakeholder genuinely unable to proceed gives `BLK=4`, hence `30×4/5 = 24` urgency points. The scale combines reach and criticality; someone merely waiting is not necessarily blocked. |
 | `CDR`, cost of delay, `0..4` | Urgency, weight 40 | “How does the cost change if you wait?” `0` no change; `1` slow accumulation; `2` clear accumulation; `3` increasing damage; `4` a date cliff. | A submission that becomes impossible after Friday gives `CDR=4`, hence `40×4/4 = 40` urgency points. |
 | `HOR`, visibility horizon, `0..4` | Urgency, weight 30 | “When will the problem become visible?” `0` never; `1` in over a month; `2` in 2-4 weeks; `3` this week; `4` already visible. | A consequence visible this week gives `HOR=3`, hence `30×3/4 = 22.5` urgency points. |
 | `IMP`, impact, `0..4` | Importance, weight 35 | “What is the real difference between done and not done?” `0` negligible; `1` some comfort; `2` noticeable; `3` major; `4` structural. | A certification that materially changes access to a role may give `IMP=3`, hence `35×3/4 = 26.25` importance points. |
@@ -414,17 +414,31 @@ never provides `U`, `I`, `G`, the quadrant, or the priority directly.
 | `ALN`, goal alignment, `0..3` | Importance, weight 20 | “Does this task contribute to one of your life goals?” `0` none; `1` indirect; `2` direct; `3` major. | Preparing the decisive exam for an active goal may give `ALN=3`, hence 20 points and the importance floor below. |
 
 **Express interview and derived values.** Express mode asks for the instinctive
-priority, `INA`, `BLK`, `CDR`, `ALN`, and the estimate. If it does not escalate
-to full mode, missing axes are filled deterministically: `IMP = min(INA, 3)`,
-`IRR = 1`, and `HOR` comes from the deadline: `4` when overdue or due today,
+priority, then `IMP`, `INA`, `BLK`, `CDR`, `ALN`, and the estimate, one question
+and one answer at a time. `IMP` is always explicit because positive impact and
+one-month inaction damage are independent criteria. If the interview does not
+escalate, only `IRR = 1` and `HOR` are derived. `HOR` comes from the deadline:
+`4` when overdue or due today,
 `3` in 1-7 days, `2` in 8-30 days, `1` beyond 30 days, or median `2` without a
 deadline. The rationale marks these values as defaults. Full mode asks for
-`IMP`, `HOR`, `IRR`, effort, and bias metadata explicitly.
+`HOR`, `IRR`, effort, and bias metadata explicitly.
 
-**Uncertainty.** “I don't know” is not zero. The value falls back to the
-conservative axis median: `BLK=2`, `CDR=2`, `HOR=2`, `IMP=2`, `INA=2`, `IRR=1`,
-`ALN=1`, and the evaluation becomes provisional. Hesitation is recorded but
-does not replace a confirmed value.
+**Uncertainty and robustness.** “I don't know” is not zero. The central score
+uses the conservative median: `BLK=2`, `CDR=2`, `HOR=2`, `IMP=2`, `INA=2`,
+`IRR=1`, `ALN=1`. Algorithm v2 also computes an interval:
+
+- certain `v`: `[v,v]`;
+- hesitant `v`: `[max(0,v-1), min(axis_max,v+1)]`;
+- unknown: `[median-1,median+1]`, clipped to the scale;
+- legacy records with derived `IMP`: strict `[0,4]`.
+
+The low and high corners are recomputed with the same weights and floors. If
+the `U` interval crosses 55 or `I` crosses 50, the quadrant is **sensitive**,
+the evaluation is provisional, and all possible quadrants are reported. The
+**pivot axis** is the uncertain axis with the largest weighted swing
+`weight × (high-low) / maximum` on the crossed threshold. For example,
+hesitant `IMP=2` gives `[1,3]`, a 17.5-point importance swing. If `I` then spans
+42 to 59, Q4 and Q2 are possible and `IMP` should be clarified first.
 
 **Parameters that do not directly enter the score.**
 
@@ -453,9 +467,10 @@ Before `G` is computed, three deterministic floors are applied in this order:
 
 1. deadline in 7 days or less **and** `CDR=4`: `U = max(U, 70)`;
 2. `IRR=3` **and** `INA>=3`: `I = max(I, 70)`;
-3. `ALN=3`: `I = max(I, 55)`.
+3. `ALN=3` **and** (`IMP>=2` or `INA>=2`): `I = max(I, 55)`.
 
-A floor does not add 70 points; it only raises a lower total to that minimum.
+The third guard prevents declared alignment alone from forcing P2 without
+measurable impact or inaction cost. A floor does not add 70 points; it only raises a lower total to that minimum.
 The rationale JSON keeps the weighted terms and every before/after adjustment.
 
 The quadrant then uses `U >= 55` and `I >= 50`:
@@ -479,7 +494,7 @@ G = 0.6×65.42 + 0.4×43.5 = 56.65
 
 `U < 55` and `I >= 50` produce Q2/P2. The goal floor changes nothing because
 `I` already exceeds 55. With a known 45-minute estimate, this is also a
-**gem**: `I >= 45` and duration `<= 60 min`. Displayed leverage is
+**gem**: `I >= 50` and duration `<= 60 min`. Displayed leverage is
 `I / max(duration_in_hours, 0.25)`, about `87.2` importance points per hour
 here. Leverage is informative; only the +10 gem bonus enters daily planning.
 
@@ -494,7 +509,7 @@ here. Leverage is informative; only the +10 gem bonus enters daily planning.
 V = G + gem_bonus + deadline_bonus + energy_adjustment
 ```
 
-The gem bonus is `+10` when `I >= 45`, the estimate is known, and duration is
+The gem bonus is `+10` when `I >= 50`, the estimate is known, and duration is
 `<= 60 min`. Deadline bonuses are bounded:
 
 | Deadline | D<=0 | D<=1 | D<=3 | D<=7 | D<=14 | D<=30 | >30 or none |
@@ -525,6 +540,43 @@ Energy adjustment depends on effort:
 `V=55+35=90` and comes first. A P4 due today remains excluded despite its
 theoretical bonus, because eligibility is checked before `V`.
 
+### 6.5 Models, Sensitivity, Limitations, And Sources
+
+PRIORIS uses two successive models that must not be conflated:
+
+1. **classification**: the `U` and `I` thresholds select Q1-Q4/P1-P4;
+2. **ordering**: `G`, then `V`, rank already classified tasks and fill the day.
+
+A high `G` therefore never turns P4 into P2. Robustness intervals test the
+stability of classification; they are not probabilities. Current weights are
+kept for continuity. Future calibration should use observed decisions and
+**swing weighting**, comparing a minimum-to-maximum move on each criterion and
+then testing sensitivity, as recommended by the UK government's
+[MCDA guidance](https://www.gov.uk/government/publications/green-book-supplementary-guidance-multi-criteria-decision-analysis/use-of-multi-criteria-decision-analysis-in-options-appraisal-of-economic-cases).
+
+Known limitations to audit on real usage data:
+
+- `CDR` and `HOR` may overlap temporally; measure correlation before changing
+  either weight.
+- `BLK` is ordinal and combines reach with criticality; `BLK=4` does not mean
+  mathematically twice `BLK=2`.
+- the deadline bonus, capped at +40, is a planning heuristic separate from the
+  score and should be reviewed against plan history.
+- task dependencies are not modeled yet; `BLK` only captures current blockage.
+- `/info` preselection is lexical. Embeddings could improve synonyms but would
+  add another model, disk weight, and offline inference path.
+
+Method references: the weighted additive model and sensitivity analysis follow
+the MCDA guidance above and the JRC study on rank robustness under uncertainty
+([JRC, 2013](https://publications.jrc.ec.europa.eu/repository/handle/JRC87397)).
+Cost of delay divided by duration is a comparison point, not the PRIORIS
+formula ([WSJF](https://framework.scaledagile.com/wsjf/)). Structured LLM
+outputs follow the principles documented by
+[llama.cpp GBNF](https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md),
+[mistral.rs](https://github.com/EricLBuehler/mistral.rs), and
+[JSONSchemaBench](https://arxiv.org/abs/2501.10868). These sources support the
+method; PRIORIS weights and thresholds remain versioned product choices.
+
 ## 7. `/info`
 
 `/info` adds new information or asks a question about current work.
@@ -539,6 +591,12 @@ Supported flows:
 - detected deadline proposal that the user must confirm or edit;
 - confirmed axis revision with deterministic recalculation;
 - manual fallback without LLM, for example `BLK=4 reason`.
+
+Before the LLM call, PRIORIS deterministically selects at most five candidates
+using normalized significant-word overlap and stable id ordering. The LLM must
+classify each candidate independently; any id outside that shortlist is
+rejected. An empty shortlist means “propose a new task”. This keeps context
+small and avoids bundling a second embeddings model in the offline release.
 
 When the task is linked to Obsidian, accepting a revision can trigger an
 Obsidian sync proposal with a before/after preview. No vault write happens
@@ -586,6 +644,19 @@ and are migrated to the short format by **Sync Obsidian**.
 The GUI shows a green/red LLM status indicator. Telegram and GUI diagnostics use
 warm-up retries and write details to `logs/llm.log`.
 
+Calls use temperature zero and task-specific output budgets: about 96 tokens
+for an axis/option, 128 for one challenge answer, 192 for three challenge
+questions, and 320 for `/info`, always capped by `max_tokens`. Explicit
+`status="abstain"` or confidence below `0.55` triggers manual fallback.
+
+The Rust embedded GGUF path uses `mistral.rs` JSON Schema constrained decoding
+and keeps the model in process, without a server or port. Python's standalone
+`llama-simple` path remains CLI/stdout and starts one process per call; that
+binary has no `llama-cli` grammar flag, so PRIORIS uses strict prompts,
+validation, abstention, and two attempts. Compatible endpoints use
+`response_format` where available. None of these paths lets the LLM calculate
+or write a priority.
+
 ## 10. Current Status
 
 Implemented:
@@ -598,7 +669,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 205 passing automated tests.
+- 214 passing automated tests.
 
 Still possible future work:
 

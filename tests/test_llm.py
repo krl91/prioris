@@ -10,6 +10,7 @@ import pytest
 from prioris.core.axes import Axis
 from prioris.llm.client import ChatClient, LLMConfig, LLMError, resolve
 from prioris.llm.facade import LLMFacade, _extract_json
+from prioris.llm.shortlist import shortlist_tasks
 
 
 # --------------------------------------------------------------- config
@@ -173,6 +174,15 @@ def test_client_appelle_le_bon_endpoint():
     assert call["url"].endswith("/v1/chat/completions")
     assert call["payload"]["temperature"] == 0
     assert call["payload"]["model"] == "m"
+    assert call["payload"]["max_tokens"] == 512
+
+
+def test_client_applique_budget_par_appel_sans_depasser_config():
+    t = fake_transport("ok")
+    client = ChatClient(LLMConfig(enabled=True, provider="ollama", model="m",
+                                  max_tokens=200), t)
+    client.chat("sys", "usr", max_tokens=96)
+    assert t.calls[0]["payload"]["max_tokens"] == 96
 
 
 def test_client_api_key_en_header():
@@ -498,6 +508,40 @@ def test_impact_taches_valide_et_journalise():
     assert result["new_task_title"] == ""
     assert result["suggested_deadline"] == "2026-07-20"
     assert calls == [("task_impact", "m", True)]
+
+
+def test_info_preslectionne_au_plus_cinq_taches_pertinentes():
+    tasks = [(1, "Retour client"), (2, "Acheter du pain"),
+             (3, "Préparer la réunion client"), (4, "Faire du sport")]
+    assert shortlist_tasks(tasks, "Le client attend une réponse") == [
+        (1, "Retour client"), (3, "Préparer la réunion client")]
+
+
+def test_info_ne_transmet_que_la_presselection_au_llm():
+    raw = json.dumps({
+        "impacted": [{"id": 2, "impact": "Même sujet."}],
+        "new_task_title": "", "suggested_deadline": "",
+        "direct_answer": "", "explanation": "Lien clair.",
+    })
+    transport = fake_transport(raw)
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="ollama", model="m"), transport))
+    result = facade.impacted_tasks(
+        [(1, "Retour client"), (2, "Acheter des pommes")],
+        "Il faut acheter une pomme ce soir")
+    sent = json.loads(transport.calls[0]["payload"]["messages"][1]["content"])
+    assert sent["taches_existantes"] == [{"id": 2, "titre": "Acheter des pommes"}]
+    assert result["impacted"][0]["id"] == 2
+
+
+def test_abstention_ou_confiance_faible_declenche_repli_manuel():
+    abstain = json.dumps({
+        "valeur": 2, "incertitude": 2, "reformulation": "Je ne sais pas.",
+        "status": "abstain", "confidence": 0.1,
+    })
+    facade = facade_with(abstain)
+    assert facade.interpret_answer(Axis.IMP, "Impact ?", "je ne sais pas") is None
+    assert "abstient" in facade.last_error
 
 
 def test_impact_taches_ignore_date_invalide():

@@ -152,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `205 passed`.
+Expected result in a full source repository clone: `214 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -238,7 +238,7 @@ explained and confirmed before it can affect the calculation.
 - One displayed question always expects one answer. An unconfirmed LLM
   interpretation is never used.
 - The seven axes come from factual questions: `BLK` actual blockage (for
-  example, a blocked client), `CDR` cost of delay (a cost cliff at a date),
+  example, a blocked critical stakeholder), `CDR` cost of delay (a cost cliff at a date),
   `HOR` visibility horizon (visible this week), `IMP` difference between done
   and not done (a structural gain), `INA` consequence of one month of inaction
   (a crisis), `IRR` irreversibility (cannot be recovered), and `ALN` alignment
@@ -249,12 +249,19 @@ explained and confirmed before it can affect the calculation.
   `G = 0.6×I + 0.4×U`.
 - Thresholds: urgent if `U >= 55`, important if `I >= 50`. `Q1 -> P1`, `Q2 ->
   P2`, `Q3 -> P3`, `Q4 -> P4`.
+- Express mode now asks `IMP` independently from `INA`: strategic impact is no
+  longer inferred from, or suppressed by, one-month inaction cost. Hesitant or
+  unknown answers also produce a `U/I` interval; the rationale reports whether
+  the quadrant is robust, all possible quadrants, and the pivot axis.
+- `G` ranks and schedules tasks; it does not select the quadrant, which depends
+  only on the `U` and `I` thresholds.
 - Planning value: `V = G + deadline bonus (0 to 40) + gem bonus (0 or 10) +
   energy adjustment (-25 to +10, or exclusion)`. P1 tasks are considered before
   P2/P3; P4 tasks and unknown estimates are excluded.
 
-The complete scales, one worked example per axis, express-mode defaults, score
-floors, and every planning rule are documented in [GUIDE.en.md](GUIDE.en.md),
+The complete scales, one worked example per axis, express-mode defaults,
+robustness intervals, score floors, known limitations, and every planning rule
+are documented in [GUIDE.en.md](GUIDE.en.md),
 sections 6.2 to 6.4.
 
 ### Telegram
@@ -298,7 +305,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-205 tests pass locally. Remaining possible improvements: advanced scenario
+214 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

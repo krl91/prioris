@@ -67,9 +67,9 @@ impl Axis {
                 "Personne",
                 "Moi seul",
                 "Une autre personne",
-                "Une équipe",
-                "Le client",
-                "Plusieurs équipes",
+                "Une équipe ou plusieurs personnes",
+                "Un acteur critique",
+                "Plusieurs équipes ou une chaîne critique",
             ],
             Self::CDR => &[
                 "Rien",

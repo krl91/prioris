@@ -192,6 +192,7 @@ class TestInterviewFluxLocal:
         s = Session(seed=42)
         answers = {
             Q.SUBJECTIVE:  Priorite.P2.value,
+            Q.IMPACT:      2,
             Q.INACTION:    2,
             Q.BLOCAGE:     2,
             Q.CDR:         2,
@@ -266,6 +267,7 @@ def test_why_text_avec_evaluation(tmp_conn):
     s = Session(seed=task_id)
     for q, raw in [
         (Q.SUBJECTIVE, Priorite.P2.value),
+        (Q.IMPACT, 1),
         (Q.INACTION, 1),
         (Q.BLOCAGE, 1),
         (Q.CDR, 1),

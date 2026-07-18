@@ -21,16 +21,16 @@ pub enum Question {
     Pressure,
 }
 
-const EXPRESS_FLOW: [Question; 6] = [
+const EXPRESS_FLOW: [Question; 7] = [
     Question::Subjective,
+    Question::Impact,
     Question::Inaction,
     Question::Blockage,
     Question::DelayCost,
     Question::Goal,
     Question::Estimate,
 ];
-const FULL_EXTRA: [Question; 7] = [
-    Question::Impact,
+const FULL_EXTRA: [Question; 6] = [
     Question::Horizon,
     Question::Irreversibility,
     Question::Effort,
@@ -143,10 +143,6 @@ impl InterviewSession {
         for (axis, value) in [
             (Axis::HOR, horizon_from_deadline(self.deadline_days)),
             (Axis::IRR, 1),
-            (
-                Axis::IMP,
-                self.axes.get(&Axis::INA).copied().unwrap_or(0).min(3),
-            ),
             (Axis::ALN, 0),
         ] {
             if let std::collections::hash_map::Entry::Vacant(entry) = axes.entry(axis) {

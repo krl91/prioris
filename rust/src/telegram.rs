@@ -333,14 +333,24 @@ fn finish_interview(
     ) {
         return error.to_string();
     }
+    let robustness = if result.robust {
+        format!("Quadrant robuste : {}", result.quadrant)
+    } else {
+        format!(
+            "Quadrant sensible : {} · axe pivot {}",
+            result.possible_quadrants.join(" / "),
+            result.pivot_axis.as_deref().unwrap_or("indéterminé")
+        )
+    };
     format!(
-        "#{} {} · {} · score {:.1}/100\nUrgence {:.1} · Importance {:.1}",
+        "#{} {} · {} · score {:.1}/100\nUrgence {:.1} · Importance {:.1}\n{}",
         id,
         result.priority.as_str(),
         result.quadrant,
         result.global,
         result.urgency,
-        result.importance
+        result.importance,
+        robustness
     )
 }
 

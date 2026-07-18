@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .axes import (AXIS_MAX, AXIS_MEDIAN, ESTIMATION_MIN, QUADRANT_INFO,
                    Axis, Estimation, Incertitude, Priorite)
 
-VERSION_ALGO = 1
+VERSION_ALGO = 2
 
 # Weights, on a 100-point basis.
 W_U = {Axis.BLK: 30, Axis.CDR: 40, Axis.HOR: 30}
@@ -20,7 +20,7 @@ SEUIL_IMPORTANT = 50
 POIDS_I, POIDS_U = 0.6, 0.4
 
 # High-leverage small task threshold.
-PEPITE_I_MIN = 45
+PEPITE_I_MIN = SEUIL_IMPORTANT
 PEPITE_EST_MAX_MIN = 60
 
 
@@ -34,6 +34,9 @@ class ScoreResult:
     provisoire: bool
     pepite: bool
     levier: float            # importance per estimated hour
+    robuste: bool
+    quadrants_possibles: tuple[str, ...]
+    axe_pivot: str | None
     justification: dict = field(compare=False)
 
     def as_tuple(self) -> tuple:
@@ -51,6 +54,84 @@ def _apply_uncertainty(axes: dict[Axis, int],
             adjusted[axis] = AXIS_MEDIAN[axis]
             replaced.append(axis)
     return adjusted, replaced
+
+
+def _score_pair(values: dict[Axis, int], deadline_days: int | None,
+                record: bool = False) -> tuple[float, float, list[dict]]:
+    """Return adjusted U/I scores for one point in the uncertainty space."""
+    urgence = sum(weight * values[axis] / AXIS_MAX[axis]
+                  for axis, weight in W_U.items())
+    importance = sum(weight * values[axis] / AXIS_MAX[axis]
+                     for axis, weight in W_I.items())
+    ajustements: list[dict] = []
+
+    def apply_floor(name: str, current: float, floor: float) -> float:
+        if record and current < floor:
+            ajustements.append({"regle": name, "avant": current, "apres": floor})
+        return max(current, floor)
+
+    if deadline_days is not None and deadline_days <= 7 and values[Axis.CDR] == 4:
+        urgence = apply_floor("plancher_deadline", urgence, 70.0)
+    if values[Axis.IRR] == 3 and values[Axis.INA] >= 3:
+        importance = apply_floor("plancher_irreversibilite", importance, 70.0)
+    if (values[Axis.ALN] == 3
+            and (values[Axis.IMP] >= 2 or values[Axis.INA] >= 2)):
+        importance = apply_floor("plancher_objectifs", importance, 55.0)
+    elif record and values[Axis.ALN] == 3:
+        ajustements.append({
+            "regle": "garde_fou_objectifs",
+            "motif": "ALN seul ne suffit pas sans impact ou coût d'inaction",
+        })
+    return urgence, importance, ajustements
+
+
+def _uncertainty_ranges(values: dict[Axis, int],
+                        incertitudes: dict[Axis, Incertitude],
+                        axes_par_defaut: set[Axis]) -> dict[Axis, tuple[int, int]]:
+    """Build auditable value intervals used for quadrant robustness."""
+    ranges: dict[Axis, tuple[int, int]] = {}
+    for axis in Axis:
+        value = values[axis]
+        if axis == Axis.IMP and axis in axes_par_defaut:
+            ranges[axis] = (0, AXIS_MAX[axis])
+        elif incertitudes.get(axis) == Incertitude.NE_SAIT_PAS:
+            median = AXIS_MEDIAN[axis]
+            ranges[axis] = (max(0, median - 1), min(AXIS_MAX[axis], median + 1))
+        elif incertitudes.get(axis) == Incertitude.HESITANT:
+            ranges[axis] = (max(0, value - 1), min(AXIS_MAX[axis], value + 1))
+        else:
+            ranges[axis] = (value, value)
+    return ranges
+
+
+def _quadrants_for_bounds(u_min: float, u_max: float,
+                          i_min: float, i_max: float) -> tuple[str, ...]:
+    urgent_states = ([False] if u_max < SEUIL_URGENT else
+                     [True] if u_min >= SEUIL_URGENT else [False, True])
+    important_states = ([False] if i_max < SEUIL_IMPORTANT else
+                        [True] if i_min >= SEUIL_IMPORTANT else [False, True])
+    order = ("Q1", "Q2", "Q3", "Q4")
+    found = set()
+    for urgent in urgent_states:
+        for important in important_states:
+            found.add("Q1" if urgent and important else
+                      "Q2" if important else "Q3" if urgent else "Q4")
+    return tuple(q for q in order if q in found)
+
+
+def _pivot_axis(ranges: dict[Axis, tuple[int, int]], u_crosses: bool,
+                i_crosses: bool) -> str | None:
+    candidates: list[tuple[float, Axis]] = []
+    if u_crosses:
+        candidates.extend((W_U[axis] * (hi - lo) / AXIS_MAX[axis], axis)
+                          for axis, (lo, hi) in ranges.items()
+                          if axis in W_U and hi > lo)
+    if i_crosses:
+        candidates.extend((W_I[axis] * (hi - lo) / AXIS_MAX[axis], axis)
+                          for axis, (lo, hi) in ranges.items()
+                          if axis in W_I and hi > lo)
+    return max(candidates, default=(0.0, None), key=lambda item: item[0])[1].value \
+        if candidates else None
 
 
 def score(axes: dict[Axis, int],
@@ -71,27 +152,24 @@ def score(axes: dict[Axis, int],
     incertitudes = incertitudes or {}
     axes_par_defaut = axes_par_defaut or set()
     values, replaced = _apply_uncertainty(axes, incertitudes)
-    provisoire = bool(replaced) or estimation == Estimation.INCONNUE
+    provisoire = (bool(replaced) or estimation == Estimation.INCONNUE
+                  or bool(axes_par_defaut & {Axis.IMP}))
 
     termes_u = {a: w * values[a] / AXIS_MAX[a] for a, w in W_U.items()}
     termes_i = {a: w * values[a] / AXIS_MAX[a] for a, w in W_I.items()}
-    urgence = sum(termes_u.values())
-    importance = sum(termes_i.values())
+    urgence, importance, ajustements = _score_pair(values, deadline_days, record=True)
 
-    # Deterministic adjustments, in this order.
-    ajustements: list[dict] = []
-    if deadline_days is not None and deadline_days <= 7 and values[Axis.CDR] == 4:
-        if urgence < 70:
-            ajustements.append({"regle": "plancher_deadline", "avant": urgence, "apres": 70.0})
-        urgence = max(urgence, 70.0)
-    if values[Axis.IRR] == 3 and values[Axis.INA] >= 3:
-        if importance < 70:
-            ajustements.append({"regle": "plancher_irreversibilite", "avant": importance, "apres": 70.0})
-        importance = max(importance, 70.0)
-    if values[Axis.ALN] == 3:
-        if importance < 55:
-            ajustements.append({"regle": "plancher_objectifs", "avant": importance, "apres": 55.0})
-        importance = max(importance, 55.0)
+    ranges = _uncertainty_ranges(values, incertitudes, axes_par_defaut)
+    lower = {axis: bounds[0] for axis, bounds in ranges.items()}
+    upper = {axis: bounds[1] for axis, bounds in ranges.items()}
+    u_min, i_min, _ = _score_pair(lower, deadline_days)
+    u_max, i_max, _ = _score_pair(upper, deadline_days)
+    quadrants_possibles = _quadrants_for_bounds(u_min, u_max, i_min, i_max)
+    robuste = len(quadrants_possibles) == 1
+    u_crosses = u_min < SEUIL_URGENT <= u_max
+    i_crosses = i_min < SEUIL_IMPORTANT <= i_max
+    axe_pivot = _pivot_axis(ranges, u_crosses, i_crosses)
+    provisoire = provisoire or not robuste
 
     global_ = POIDS_I * importance + POIDS_U * urgence
 
@@ -125,6 +203,13 @@ def score(axes: dict[Axis, int],
                   "total": round(importance, 2)},
             "G": {"formule": f"{POIDS_I}*I + {POIDS_U}*U", "total": round(global_, 2)},
         },
+        "robustesse": {
+            "robuste": robuste,
+            "U_intervalle": [round(u_min, 2), round(u_max, 2)],
+            "I_intervalle": [round(i_min, 2), round(i_max, 2)],
+            "quadrants_possibles": list(quadrants_possibles),
+            "axe_pivot": axe_pivot,
+        },
         "ajustements": ajustements,
         "seuils": {"urgent": SEUIL_URGENT, "important": SEUIL_IMPORTANT},
         "quadrant": quadrant,
@@ -136,7 +221,8 @@ def score(axes: dict[Axis, int],
         "provisoire": provisoire,
     }
     return ScoreResult(urgence, importance, global_, quadrant, priorite,
-                       provisoire, pepite, levier, justification)
+                       provisoire, pepite, levier, robuste,
+                       quadrants_possibles, axe_pivot, justification)
 
 
 def explain(result: ScoreResult) -> str:
@@ -151,11 +237,24 @@ def explain(result: ScoreResult) -> str:
         termes = ", ".join(f"{k}→{v}" for k, v in j["calculs"][bloc]["termes"].items())
         lines.append(f"  {bloc} = {termes}")
     for adj in j["ajustements"]:
-        lines.append(f"  ajustement {adj['regle']} : {adj['avant']:.1f} → {adj['apres']:.1f}")
+        if "avant" in adj and "apres" in adj:
+            lines.append(
+                f"  ajustement {adj['regle']} : "
+                f"{adj['avant']:.1f} → {adj['apres']:.1f}")
+        else:
+            lines.append(f"  {adj['regle']} : {adj.get('motif', '')}".rstrip())
     if j["ecart_subjectif"] is not None and j["subjective"]:
         lines.append(f"Ton instinct : {j['subjective']} (écart {j['ecart_subjectif']:+d})")
     if j["pepite"]:
         lines.append(f"💎 Pépite — levier {j['levier_par_h']} pts d'importance/heure")
+    robustesse = j["robustesse"]
+    if robustesse["robuste"]:
+        lines.append(f"Quadrant robuste : {robustesse['quadrants_possibles'][0]}")
+    else:
+        pivot = f" · axe pivot {robustesse['axe_pivot']}" if robustesse["axe_pivot"] else ""
+        lines.append("Quadrant sensible : "
+                     f"{' / '.join(robustesse['quadrants_possibles'])}{pivot}")
+        lines.append(f"  U ∈ {robustesse['U_intervalle']} · I ∈ {robustesse['I_intervalle']}")
     if j["provisoire"]:
         lines.append("⚠️ Évaluation provisoire (incertitude ou estimation inconnue)")
     return "\n".join(lines)

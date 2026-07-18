@@ -205,8 +205,14 @@ def render_detail_note(titre: str, rel_source: str, justification: dict,
               for a, d in j["axes"].items()]
     if j["ajustements"]:
         lines += ["", "## Ajustements"]
-        lines += [f"- {adj['regle']} : {adj['avant']:.1f} → {adj['apres']:.1f}"
-                  for adj in j["ajustements"]]
+        for adjustment in j["ajustements"]:
+            if "avant" in adjustment and "apres" in adjustment:
+                lines.append(
+                    f"- {adjustment['regle']} : {adjustment['avant']:.1f} → "
+                    f"{adjustment['apres']:.1f}")
+            else:
+                lines.append(
+                    f"- {adjustment['regle']} : {adjustment.get('motif', '')}".rstrip())
     if flags:
         lines += ["", "## Biais détectés"]
         lines += [f"- **{f.type_biais}** ({f.gravite}) : {f.message}" for f in flags]

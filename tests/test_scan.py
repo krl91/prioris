@@ -90,8 +90,8 @@ def test_annotate_ligne_modifiee_refuse(tmp_path):
 def test_apply_result_detail_toujours_cree(tmp_path):
     vault = make_vault(tmp_path)
     vt = scan.find_unprioritized(vault)[1]    # CV
-    # aln=3 seul ⇒ I brut 20 → plancher objectifs à 55 (ajustement tracé)
-    r = score(axes(aln=3), estimation=Estimation.M30_60,
+    # ALN=3 with measurable impact activates the guarded goal floor.
+    r = score(axes(aln=3, imp=2), estimation=Estimation.M30_60,
               subjective=Priorite.P3)
     annotated, detail_rel = scan.apply_result(
         vault, "PRIORIS", vt, 42, r.justification, [], "2026-07-12")

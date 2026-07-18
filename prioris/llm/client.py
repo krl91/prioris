@@ -124,7 +124,9 @@ class ChatClient:
     cfg: LLMConfig
     transport: Callable | None = field(default=None, repr=False)
 
-    def chat(self, system: str, user: str, json_mode: bool = True) -> str:
+    def chat(self, system: str, user: str, json_mode: bool = True,
+             max_tokens: int | None = None) -> str:
+        token_limit = min(self.cfg.max_tokens, max_tokens or self.cfg.max_tokens)
         if self.cfg.provider == "prioris":
             return local.chat(system, user)
         if self.cfg.provider == "local_gguf":
@@ -134,7 +136,7 @@ class ChatClient:
                 runner_path=runner,
                 model_path=model,
                 timeout_s=timeout,
-                max_tokens=self.cfg.max_tokens,
+                max_tokens=token_limit,
             )
             try:
                 if self.transport:
@@ -144,7 +146,7 @@ class ChatClient:
                 raise LLMError(str(e)) from e
         base, timeout = resolve(self.cfg)
         if self.cfg.provider == "anthropic":
-            return self._chat_anthropic(base, timeout, system, user)
+            return self._chat_anthropic(base, timeout, system, user, token_limit)
         url = f"{base}/chat/completions"
         headers = {"Content-Type": "application/json"}
         api_key = self.cfg.api_key
@@ -157,6 +159,7 @@ class ChatClient:
         payload: dict = {
             "model": self.cfg.model,
             "temperature": 0,
+            "max_tokens": token_limit,
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": user}],
         }
@@ -183,7 +186,7 @@ class ChatClient:
             raise LLMError(f"réponse inattendue du provider : {data!r:.200}") from e
 
     def _chat_anthropic(self, base: str, timeout: float,
-                        system: str, user: str) -> str:
+                        system: str, user: str, max_tokens: int) -> str:
         api_key = self.cfg.api_key
         if self.cfg.api_key_env:
             api_key = os.environ.get(self.cfg.api_key_env, api_key)
@@ -194,7 +197,7 @@ class ChatClient:
         }
         payload = {
             "model": self.cfg.model,
-            "max_tokens": self.cfg.max_tokens,
+            "max_tokens": max_tokens,
             "temperature": 0,
             "system": system,
             "messages": [{"role": "user", "content": user}],

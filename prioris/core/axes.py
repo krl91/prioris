@@ -34,8 +34,9 @@ AXIS_MEDIAN: dict[Axis, int] = {
 # Each label should be a natural answer to its axis question. It is both a UI
 # button and the scale provided to the LLM for NLU.
 AXIS_LABELS: dict[Axis, list[str]] = {
-    Axis.BLK: ["Personne", "Moi seul", "Une autre personne", "Une équipe",
-               "Le client", "Plusieurs équipes"],
+    Axis.BLK: ["Personne", "Moi seul", "Une autre personne",
+               "Une équipe ou plusieurs personnes", "Un acteur critique",
+               "Plusieurs équipes ou une chaîne critique"],
     Axis.CDR: ["Rien — le coût ne bouge pas", "Il s'accumule doucement",
                "Il s'accumule nettement", "Il s'aggrave de plus en plus",
                "Falaise : tout se joue à une date"],
@@ -159,10 +160,13 @@ def hor_from_deadline(deadline_days: int | None) -> int:
     return 1
 
 
-def express_defaults(ina: int, deadline_days: int | None) -> dict[Axis, int]:
-    """Deterministic defaults for axes not asked in express mode."""
+def express_defaults(deadline_days: int | None) -> dict[Axis, int]:
+    """Deterministic defaults for axes not asked in express mode.
+
+    IMP is deliberately absent: impact and inaction are independent concepts,
+    so every interview asks IMP explicitly.
+    """
     return {
         Axis.HOR: hor_from_deadline(deadline_days),
         Axis.IRR: 1,
-        Axis.IMP: min(ina, 3),   # assumed correlation, capped
     }

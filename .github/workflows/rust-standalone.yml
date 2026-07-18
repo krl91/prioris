@@ -184,6 +184,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           pattern: rust-release-*
@@ -196,22 +197,7 @@ jobs:
           cd ..
           version="${GITHUB_REF_NAME#rust-}"
           echo "RELEASE_NAME=PRIORIS Rust $version" >> "$GITHUB_ENV"
-          cat > release-notes.md <<'EOF'
-          ## PRIORIS Rust __VERSION__
-
-          Première release autonome du port natif Rust. Elle est indépendante des releases Python `v0.x` et ne remplace pas leur statut « Latest ».
-
-          ### Téléchargement
-
-          - macOS Apple Silicon : `prioris-__TAG__-macos-arm64.zip`
-          - Windows x64 : `prioris-__TAG__-windows-x64.zip`
-          - Linux x64 : `prioris-__TAG__-linux-x64.tar.gz`
-          - Vérification : `SHA256SUMS.txt`
-
-          Chaque archive contient le binaire natif, `config.toml`, les scripts de lancement, `ObsidianVault` et le modèle Ministral 3B GGUF. Le modèle est chargé dans le processus, sans serveur et sans port local.
-
-          Cette version Rust est publiée en préversion : consultez le [README Rust](https://github.com/__REPOSITORY__/blob/__TAG__/rust/README.md) pour les limites de parité avec la version Python.
-          EOF
+          cp .github/release-notes/rust-latest.md release-notes.md
           sed -i "s/__VERSION__/$version/g; s/__TAG__/$GITHUB_REF_NAME/g; s|__REPOSITORY__|$GITHUB_REPOSITORY|g" release-notes.md
       - name: Create Rust GitHub release
         uses: softprops/action-gh-release@v2

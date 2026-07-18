@@ -82,7 +82,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             205 tests automatisés
+tests/             214 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -161,7 +161,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `205 passed`.
+Résultat attendu dans un clone complet du dépôt source : `214 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -251,7 +251,7 @@ calcul.
 - Une question affichée attend toujours une réponse. Une réponse LLM non
   confirmée n'est jamais utilisée.
 - Les sept axes viennent de questions factuelles : `BLK` blocage réel
-  (ex. client bloqué), `CDR` coût du retard (ex. coût qui explose à une date),
+  (ex. acteur critique bloqué), `CDR` coût du retard (ex. coût qui explose à une date),
   `HOR` horizon de visibilité (ex. problème visible cette semaine), `IMP`
   différence entre fait et non fait (ex. gain structurant), `INA` conséquence
   d'un mois d'inaction (ex. crise), `IRR` irréversibilité (ex. décision non
@@ -262,12 +262,19 @@ calcul.
   `G = 0,6×I + 0,4×U`.
 - Seuils : urgent si `U >= 55`, important si `I >= 50`. `Q1 -> P1`, `Q2 -> P2`,
   `Q3 -> P3`, `Q4 -> P4`.
+- Le mode express demande désormais `IMP` séparément de `INA` : un fort impact
+  stratégique n'est plus déduit, ni écrasé, par le coût d'un mois d'inaction.
+  Une réponse hésitante ou inconnue produit aussi un intervalle `U/I` ; `/why`
+  indique si le quadrant est robuste, les quadrants possibles et l'axe pivot.
+- `G` départage et planifie les tâches ; il ne choisit pas le quadrant, qui
+  dépend uniquement des seuils de `U` et `I`.
 - Valeur de planification : `V = G + bonus échéance (0 à 40) + bonus pépite
   (0 ou 10) + ajustement énergie (-25 à +10, ou exclusion)`. Les P1 sont
   examinées avant les P2/P3 ; les P4 et estimations inconnues sont exclues.
 
 Les échelles complètes, un exemple chiffré par axe, les valeurs express par
-défaut, les planchers et toutes les règles du plan sont détaillés dans
+défaut, les intervalles de robustesse, les planchers, leurs limites et toutes
+les règles du plan sont détaillés dans
 [GUIDE.md](GUIDE.md), sections 2.5.2 à 2.5.4.
 
 ### Telegram
@@ -311,7 +318,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-205 tests passent localement. Les améliorations restantes envisagées sont :
+214 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

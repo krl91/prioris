@@ -11,11 +11,11 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.2.3 |
+| Système | Archive Rust 0.2.4 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.2.3-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.2.3-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.2.3-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.2.4-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.2.4-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.2.4-linux-x64.tar.gz` |
 
 Décompresse l'archive. Sous macOS, conserve `PRIORIS.app`, `config.toml`,
 `models/` et `ObsidianVault/` dans le même dossier, puis double-clique sur

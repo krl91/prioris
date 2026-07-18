@@ -1,7 +1,7 @@
-use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
-};
+use std::{ffi::OsString, path::PathBuf};
+
+#[cfg(target_os = "macos")]
+use std::path::Path;
 
 use prioris::config::Config;
 
@@ -278,12 +278,12 @@ mod tests {
     #[test]
     fn finds_distribution_directory_around_macos_app() {
         let executable = Path::new(
-            "/Applications/prioris-rust-v0.2.3-macos-arm64/PRIORIS.app/Contents/MacOS/prioris",
+            "/Applications/prioris-rust-v0.2.4-macos-arm64/PRIORIS.app/Contents/MacOS/prioris",
         );
         assert_eq!(
             macos_bundle_distribution_dir(executable),
             Some(PathBuf::from(
-                "/Applications/prioris-rust-v0.2.3-macos-arm64"
+                "/Applications/prioris-rust-v0.2.4-macos-arm64"
             ))
         );
         assert_eq!(

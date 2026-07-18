@@ -16,6 +16,7 @@ env:
 jobs:
   tests:
     name: Tests before release build
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v'))
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout PRIORIS

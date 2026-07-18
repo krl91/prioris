@@ -129,11 +129,11 @@ enabled = false
 ### 1.2 Install the standalone Rust release
 
 The Rust port is a prerelease distributed separately from Python. Starting
-with Rust 0.2.3, the macOS archive contains a real `PRIORIS.app` bundle:
+with Rust 0.2.4, the macOS archive contains a real `PRIORIS.app` bundle:
 
-1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.3`
+1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.4`
    or a newer Rust release;
-2. download `prioris-rust-v0.2.3-macos-arm64.zip` and extract it;
+2. download `prioris-rust-v0.2.4-macos-arm64.zip` and extract it;
 3. keep `PRIORIS.app`, `config.toml`, `models/` and `ObsidianVault/` together;
 4. double-click `PRIORIS.app`.
 
@@ -275,7 +275,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `228 passed`.
+Expected result: `229 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -294,7 +294,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `228 passed`.
+Expected result: `229 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -747,7 +747,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 228 passing automated tests.
+- 229 passing automated tests.
 
 Still possible future work:
 

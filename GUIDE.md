@@ -132,11 +132,11 @@ enabled = false
 ### 1.2 Installer la release Rust autonome
 
 La version Rust est une préversion séparée de la release Python. Depuis Rust
-0.2.3, l'archive macOS fournit un vrai bundle `PRIORIS.app` :
+0.2.4, l'archive macOS fournit un vrai bundle `PRIORIS.app` :
 
 1. ouvre <https://github.com/krl91/prioris/releases> et sélectionne la release
-   `rust-v0.2.3` ou une version Rust plus récente ;
-2. télécharge `prioris-rust-v0.2.3-macos-arm64.zip` ;
+   `rust-v0.2.4` ou une version Rust plus récente ;
+2. télécharge `prioris-rust-v0.2.4-macos-arm64.zip` ;
 3. décompresse l'archive sans déplacer séparément son contenu ;
 4. vérifie que `PRIORIS.app`, `config.toml`, `models/` et `ObsidianVault/` sont
    côte à côte ;
@@ -149,8 +149,8 @@ donc pas demander de retirer la quarantaine. Le script `scripts/run.sh` reste
 disponible pour un lancement en terminal et exécute le même Mach-O signé.
 
 Pour Windows et Linux, télécharge respectivement
-`prioris-rust-v0.2.3-windows-x64.zip` ou
-`prioris-rust-v0.2.3-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
+`prioris-rust-v0.2.4-windows-x64.zip` ou
+`prioris-rust-v0.2.4-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
 `scripts/run.sh`.
 
 #### Configurer la signature Apple du workflow
@@ -441,7 +441,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `228 passed`.
+Résultat attendu : `229 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -460,7 +460,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `228 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `229 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.7 Rappels pour Obsidian et Windows
@@ -1554,7 +1554,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 228 tests automatisés passent localement dans le dépôt source
+**État tests** : 229 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

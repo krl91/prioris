@@ -1,12 +1,18 @@
 # PRIORIS
 
-PRIORIS is a personal decision assistant for choosing what to do now, what to
-schedule, what to delegate and what to drop. It turns a task list into explained
-priorities, a realistic daily plan and synchronized Obsidian notes.
+PRIORIS helps you focus on what truly matters.
 
-The important principle: the decision core is deterministic and explainable. An
-LLM can help interpret text, ask better questions or propose a change, but it
-never writes changes without confirmation.
+When everything feels urgent, PRIORIS guides you through a structured decision process to determine what to do now, what to schedule, what to delegate, and what to ignore.
+
+Inspired by the Eisenhower Matrix and enhanced by intelligent questioning, every recommendation is transparent, justified, and easy to understand.
+
+✔ Clear and explainable priorities
+✔ Realistic daily action plans
+✔ Reduced cognitive load
+✔ Seamless Obsidian integration
+✔ Human-controlled decision making
+
+AI supports your thinking. You remain in control.
 
 ## What It Is For
 
@@ -78,7 +84,7 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             228 automated tests
+tests/             229 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
@@ -86,7 +92,7 @@ vault, SQLite, Telegram nor any network client.
 
 The experimental native port lives in [`rust/`](rust/README.md). Its releases
 use `rust-v*` tags and remain separate from the Python `v0.x` releases. Starting
-with Rust 0.2.3, the macOS archive contains a Developer ID-signed and
+with Rust 0.2.4, the macOS archive contains a Developer ID-signed and
 Apple-notarized `PRIORIS.app` that launches by double-clicking; the workflow
 refuses to publish when a Gatekeeper check fails.
 
@@ -155,7 +161,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `228 passed`.
+Expected result in a full source repository clone: `229 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -316,7 +322,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-228 tests pass locally. Remaining possible improvements: advanced scenario
+229 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

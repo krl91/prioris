@@ -1,13 +1,18 @@
 # PRIORIS
 
-PRIORIS est un assistant personnel pour décider quoi faire maintenant, quoi
-planifier, quoi déléguer et quoi laisser de côté. Il transforme une liste de
-tâches en priorités expliquées, en plan du jour réaliste et en notes Obsidian
-synchronisées.
+PRIORIS transforme vos tâches, idées et demandes en décisions claires et assumées.
 
-Le principe important : le coeur de décision reste déterministe et explicable.
-Un LLM peut aider à comprendre une phrase, poser de meilleures questions ou
-proposer une modification, mais il ne modifie rien sans confirmation.
+Lorsque tout semble urgent, PRIORIS vous guide pas à pas pour identifier ce qui compte réellement. Il vous aide à choisir la meilleure action : agir maintenant, planifier, déléguer ou abandonner.
+
+Grâce à une approche inspirée de la matrice d’Eisenhower et à un questionnement intelligent, chaque recommandation est justifiée et traçable.
+
+✔ Priorités argumentées
+✔ Plan quotidien réaliste
+✔ Réduction de la charge mentale
+✔ Synchronisation avec Obsidian
+✔ Décisions explicables et vérifiables
+
+L’IA assiste votre réflexion, elle ne décide pas à votre place.
 
 ## À quoi ça sert
 
@@ -82,7 +87,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             228 tests automatisés
+tests/             229 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -90,7 +95,7 @@ produit un binaire Windows, Linux ou macOS sans Python et peut charger le GGUF
 Ministral directement dans le processus, sans serveur ni port. Consulte son
 README pour l'état exact de la parité fonctionnelle et les limites actuelles.
 Ses releases utilisent des tags `rust-v*` et restent séparées des releases
-Python `v0.x`. À partir de Rust 0.2.3, l'archive macOS contient une application
+Python `v0.x`. À partir de Rust 0.2.4, l'archive macOS contient une application
 `PRIORIS.app` signée Developer ID, notarée par Apple et lançable par
 double-clic ; le workflow refuse la publication si un contrôle Gatekeeper
 échoue.
@@ -164,7 +169,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `228 passed`.
+Résultat attendu dans un clone complet du dépôt source : `229 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -329,7 +334,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-228 tests passent localement. Les améliorations restantes envisagées sont :
+229 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

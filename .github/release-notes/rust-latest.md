@@ -1,18 +1,15 @@
 ## PRIORIS Rust __VERSION__
 
-## Correctifs depuis Rust 0.2.2
+## Correctifs depuis Rust 0.2.3
 
-- L'archive macOS contient maintenant `PRIORIS.app`, lançable par double-clic,
-  au lieu d'exposer un binaire nu à Finder.
-- Le bundle et son Mach-O sont signés avec un certificat Developer ID
-  Application, Hardened Runtime et horodatage Apple ; la signature ad hoc a été
-  supprimée.
-- Le workflow soumet l'application à `notarytool`, agrafe et valide le ticket,
-  puis exige une évaluation Gatekeeper `spctl` réussie avant publication.
-- L'application ouverte depuis Finder retrouve automatiquement `config.toml`,
-  le modèle GGUF et `ObsidianVault` dans le dossier extrait.
-- Une release Rust est désormais refusée si les identifiants Apple manquent ou
-  si la signature, la notarisation ou un contrôle de lancement échoue.
+- Corrige l'analyse Clippy Linux en conditionnant l'import macOS de `Path`.
+- Empêche le workflow Python de traiter les tags et releases `rust-v*`.
+- Exige les six secrets Apple avant toute construction de release macOS Rust.
+- Supprime la signature ad hoc et le script de retrait de quarantaine des
+  archives officielles ; la signature Developer ID, la notarisation, l'agrafage
+  du ticket et l'évaluation Gatekeeper doivent tous réussir.
+- Remplace la release `rust-v0.2.3`, invalide car elle contenait des artefacts
+  Python après le déclenchement incorrect du workflow principal.
 
 ## Télécharger
 

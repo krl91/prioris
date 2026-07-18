@@ -4,6 +4,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "rust-standalone.yml"
+PYTHON_WORKFLOW = ROOT / ".github" / "workflows" / "release-runtimes.yml"
 
 pytestmark = pytest.mark.skipif(
     not WORKFLOW.exists(),
@@ -12,25 +13,30 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_rust_macos_release_requires_real_apple_signing() -> None:
-    """Developer ID signing must be the primary release path.
-
-    Ad-hoc signing (--sign -) is allowed only as a fallback conditioned on
-    Apple credentials being absent (steps.apple-creds.outputs.available != 'true').
-    The credential-detection step and the Developer ID signing path must always
-    be present.
-    """
+    """Tagged releases must require Developer ID signing and notarization."""
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    # Credential check and Developer ID path must always be present
+    assert "Require Apple release credentials" in workflow
     assert "APPLE_CERTIFICATE_P12_BASE64" in workflow
+    assert "APPLE_CERTIFICATE_PASSWORD" in workflow
     assert "APPLE_SIGNING_IDENTITY" in workflow
+    assert "APPLE_ID" in workflow
+    assert "APPLE_TEAM_ID" in workflow
+    assert "APPLE_APP_SPECIFIC_PASSWORD" in workflow
     assert 'codesign --force --sign "$APPLE_SIGNING_IDENTITY"' in workflow
     assert "--options runtime --timestamp" in workflow
-    # Any ad-hoc fallback must be gated on credentials being unavailable
-    assert "steps.apple-creds.outputs.available != 'true'" in workflow, (
-        "Workflow must include a conditional ad-hoc fallback gated on "
-        "Apple credentials being absent."
-    )
+    assert "Ad-hoc sign macOS .app (no Developer ID credentials)" not in workflow
+    assert "Add allow-macos.sh to macOS release bundle" not in workflow
+    assert "steps.apple-creds.outputs.available != 'true'" not in workflow
+
+
+def test_python_release_ignores_rust_release_tags() -> None:
+    workflow = PYTHON_WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "github.event_name == 'workflow_dispatch' || (github.event_name == 'release' "
+        "&& startsWith(github.event.release.tag_name, 'v'))"
+    ) in workflow
 
 
 def test_rust_macos_release_is_notarized_and_gatekeeper_assessed() -> None:

@@ -129,13 +129,13 @@ enabled = false
 ### 1.2 Install the standalone Rust release
 
 The Rust port is a prerelease distributed separately from Python. Starting
-with Rust 0.2.4, the macOS archive contains a real `PRIORIS.app` bundle:
+with Rust 0.2.5, the macOS archive contains a `PRIORIS.app` bundle compatible
+with App Translocation:
 
-1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.4`
+1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.5`
    or a newer Rust release;
-2. download `prioris-rust-v0.2.4-macos-arm64.zip` and extract it;
-3. keep `PRIORIS.app`, `config.toml`, `models/` and `ObsidianVault/` together;
-4. double-click `PRIORIS.app`.
+2. download `prioris-rust-v0.2.5-macos-arm64.zip` and extract it;
+3. double-click `PRIORIS.app`.
 
 Without Apple secrets, the app uses free ad-hoc signing with Hardened Runtime.
 The first launch may say that Apple cannot verify the application. Close that
@@ -145,6 +145,31 @@ then confirm with **Open**. This is required only once. The archive includes the
 same bilingual procedure in `OUVRIR-MACOS.md`; no script removes quarantine
 automatically. Verify the official archive against `SHA256SUMS.txt` before
 approving it.
+
+On first launch, the bundle reads its initial resources from
+`PRIORIS.app/Contents/Resources`, then creates this writable workspace:
+
+This separation follows Apple's documented locations for
+[bundle resources](https://developer.apple.com/documentation/bundleresources/placing-content-in-a-bundle)
+and
+[Application Support data](https://developer.apple.com/documentation/foundation/url/applicationsupportdirectory).
+
+```text
+~/Library/Application Support/PRIORIS/
+├── config.toml       configuration actually used
+├── prioris.db        SQLite database created on first use
+├── ObsidianVault/    initial copy of the bundled vault
+└── models/           local links to the GGUF files in the signed bundle
+```
+
+Later launches do not overwrite the configuration, vault or database. The large
+model remains in the app bundle and is not copied a second time. The
+configuration file is created with `0600` permissions. The
+**Configuration** tab edits the file in Application Support. The root-level
+`config.toml` in the archive is an initial reference and is not reloaded on each
+double-click. If initialization fails, PRIORIS displays the error and appends it
+to `~/Library/Logs/PRIORIS/prioris.log` instead of closing silently.
+`scripts/run.sh` launches the same bundle and uses the same workspace.
 
 When all six Apple secrets are available, the workflow instead signs with a
 **Developer ID Application** certificate, submits the app with `notarytool`,

@@ -132,15 +132,14 @@ enabled = false
 ### 1.2 Installer la release Rust autonome
 
 La version Rust est une préversion séparée de la release Python. Depuis Rust
-0.2.4, l'archive macOS fournit un vrai bundle `PRIORIS.app` :
+0.2.5, l'archive macOS fournit un bundle `PRIORIS.app` compatible avec App
+Translocation :
 
 1. ouvre <https://github.com/krl91/prioris/releases> et sélectionne la release
-   `rust-v0.2.4` ou une version Rust plus récente ;
-2. télécharge `prioris-rust-v0.2.4-macos-arm64.zip` ;
-3. décompresse l'archive sans déplacer séparément son contenu ;
-4. vérifie que `PRIORIS.app`, `config.toml`, `models/` et `ObsidianVault/` sont
-   côte à côte ;
-5. double-clique sur `PRIORIS.app`.
+   `rust-v0.2.5` ou une version Rust plus récente ;
+2. télécharge `prioris-rust-v0.2.5-macos-arm64.zip` ;
+3. décompresse l'archive ;
+4. double-clique sur `PRIORIS.app`.
 
 Sans secrets Apple, le bundle utilise une signature ad hoc gratuite avec
 Hardened Runtime. Le premier double-clic peut afficher qu'Apple ne peut pas
@@ -158,6 +157,35 @@ retire automatiquement la quarantaine : l'utilisateur conserve le contrôle de
 l'autorisation macOS. Vérifie auparavant que l'archive vient de la release
 officielle et que son empreinte correspond à `SHA256SUMS.txt`.
 
+Au premier démarrage, le bundle lit ses ressources initiales depuis
+`PRIORIS.app/Contents/Resources`, puis crée l'espace de travail modifiable
+suivant :
+
+Cette séparation suit les emplacements recommandés par Apple pour les
+[ressources d'un bundle](https://developer.apple.com/documentation/bundleresources/placing-content-in-a-bundle)
+et les
+[données Application Support](https://developer.apple.com/documentation/foundation/url/applicationsupportdirectory).
+
+```text
+~/Library/Application Support/PRIORIS/
+├── config.toml       configuration réellement utilisée
+├── prioris.db        base SQLite créée au premier usage
+├── ObsidianVault/    copie initiale du vault fourni
+└── models/           liens locaux vers les GGUF du bundle signé
+```
+
+Les lancements suivants ne remplacent ni `config.toml`, ni le vault, ni la base.
+Le modèle volumineux reste dans le bundle et n'est pas copié une seconde fois.
+Le fichier de configuration est créé avec les permissions `0600`.
+L'onglet **Configuration** modifie le `config.toml` de ce dossier. Le
+`config.toml` visible à la racine de l'archive est la configuration initiale de
+référence ; il n'est pas relu à chaque double-clic.
+
+Si l'initialisation échoue, PRIORIS affiche l'erreur au lieu de se fermer
+silencieusement et l'ajoute à
+`~/Library/Logs/PRIORIS/prioris.log`. Le script `scripts/run.sh` lance le même
+bundle avec le même espace Application Support.
+
 Lorsque les six secrets Apple sont disponibles, le workflow remplace ce chemin
 gratuit par une signature **Developer ID Application**, une notarisation avec
 `notarytool`, l'agrafage du ticket avec `stapler` et une évaluation `spctl`. Dans
@@ -165,8 +193,8 @@ ce cas, **Ouvrir quand même** ne devrait pas être nécessaire. Le script
 `scripts/run.sh` reste disponible et exécute le même Mach-O que `PRIORIS.app`.
 
 Pour Windows et Linux, télécharge respectivement
-`prioris-rust-v0.2.4-windows-x64.zip` ou
-`prioris-rust-v0.2.4-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
+`prioris-rust-v0.2.5-windows-x64.zip` ou
+`prioris-rust-v0.2.5-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
 `scripts/run.sh`.
 
 #### Configurer la signature Apple du workflow (optionnel)

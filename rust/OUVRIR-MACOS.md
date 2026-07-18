@@ -16,6 +16,11 @@ Les lancements suivants se font normalement. Pour une release publiée,
 n'autorise l'application que si l'archive vient de la release officielle
 PRIORIS et si son empreinte correspond à `SHA256SUMS.txt`.
 
+Au premier démarrage réussi, PRIORIS copie sa configuration et son vault dans
+`~/Library/Application Support/PRIORIS`. Le modèle reste dans le bundle signé.
+En cas de fermeture inattendue, consulte
+`~/Library/Logs/PRIORIS/prioris.log` : une alerte indique aussi ce chemin.
+
 ## Allow PRIORIS on macOS
 
 This archive uses free ad-hoc signing. macOS may block the first launch because
@@ -31,3 +36,8 @@ Apple has not verified the developer identity.
 Later launches work normally. For a published release, only approve the
 application when the archive comes from the official PRIORIS release and its
 checksum matches `SHA256SUMS.txt`.
+
+On the first successful start, PRIORIS copies its configuration and vault to
+`~/Library/Application Support/PRIORIS`. The model remains in the signed app
+bundle. If startup fails, check `~/Library/Logs/PRIORIS/prioris.log`; the error
+alert also displays this path.

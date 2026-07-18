@@ -95,11 +95,13 @@ produit un binaire Windows, Linux ou macOS sans Python et peut charger le GGUF
 Ministral directement dans le processus, sans serveur ni port. Consulte son
 README pour l'état exact de la parité fonctionnelle et les limites actuelles.
 Ses releases utilisent des tags `rust-v*` et restent séparées des releases
-Python `v0.x`. À partir de Rust 0.2.4, l'archive macOS contient une application
+Python `v0.x`. À partir de Rust 0.2.5, l'archive macOS contient une application
 `PRIORIS.app`. Sans compte Apple payant, elle est signée ad hoc : au premier
 lancement, l'utilisateur l'autorise dans **Réglages Système > Confidentialité
-et sécurité > Ouvrir quand même**. Si les six secrets Apple sont configurés,
-le même workflow utilise Developer ID et la notarisation Apple.
+et sécurité > Ouvrir quand même**. Elle stocke ses données modifiables dans
+`~/Library/Application Support/PRIORIS` et reste compatible avec App
+Translocation. Si les six secrets Apple sont configurés, le même workflow
+utilise Developer ID et la notarisation Apple.
 
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
 store, ni bot, ni vault, ni SQLite, ni Telegram, ni client réseau.

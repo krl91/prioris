@@ -1,18 +1,17 @@
 ## PRIORIS Rust __VERSION__
 
-## Correctifs depuis Rust 0.2.3
+## Correctifs depuis Rust 0.2.4
 
-- Corrige l'analyse Clippy Linux en conditionnant l'import macOS de `Path`.
-- Empêche le workflow Python de traiter les tags et releases `rust-v*`.
-- Permet une release macOS gratuite avec signature ad hoc lorsque les secrets
-  Apple sont absents ; l'utilisateur autorise une fois `PRIORIS.app` dans les
-  réglages de sécurité macOS.
-- Inclut `OUVRIR-MACOS.md` avec la procédure bilingue et ne retire jamais la
-  quarantaine automatiquement dans la distribution Rust.
-- Conserve le chemin Developer ID et notarisation lorsque les six secrets Apple
-  sont configurés, et refuse une configuration partielle.
-- Remplace la release `rust-v0.2.3`, invalide car elle contenait des artefacts
-  Python après le déclenchement incorrect du workflow principal.
+- Corrige la fermeture immédiate de `PRIORIS.app` lors d'un lancement depuis
+  Finder avec App Translocation.
+- Place le modèle, la configuration initiale et le vault initial dans
+  `Contents/Resources`, à l'intérieur du bundle signé.
+- Initialise les données modifiables dans
+  `~/Library/Application Support/PRIORIS` sans écraser les changements de
+  l'utilisateur lors des lancements suivants.
+- Affiche une alerte en cas d'échec au démarrage et écrit le diagnostic dans
+  `~/Library/Logs/PRIORIS/prioris.log`.
+- Ajoute des tests macOS dédiés au runtime du bundle avant sa publication.
 
 ## Télécharger
 
@@ -22,8 +21,8 @@
 - Vérification : `SHA256SUMS.txt`
 
 Chaque archive contient l'application native, `config.toml`, les scripts de
-lancement, `ObsidianVault` et le modèle Ministral 3B GGUF. Sur macOS, conserve
-ces éléments dans le même dossier et ouvre `PRIORIS.app`.
+lancement, `ObsidianVault` et le modèle Ministral 3B GGUF. Sur macOS, ouvre
+`PRIORIS.app` : elle initialise automatiquement son espace de travail local.
 
 Cette version Rust reste publiée en préversion et séparée des releases Python.
 Consultez le [README Rust](https://github.com/__REPOSITORY__/blob/__TAG__/rust/README.md),

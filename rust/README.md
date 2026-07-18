@@ -11,21 +11,30 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.2.4 |
+| Système | Archive Rust 0.2.5 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.2.4-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.2.4-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.2.4-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.2.5-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.2.5-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.2.5-linux-x64.tar.gz` |
 
-Décompresse l'archive. Sous macOS, conserve `PRIORIS.app`, `config.toml`,
-`models/` et `ObsidianVault/` dans le même dossier, puis double-clique sur
-`PRIORIS.app`. Par défaut, l'application est signée ad hoc gratuitement. Au
+Décompresse l'archive. Sous macOS, double-clique sur `PRIORIS.app`. Depuis la
+version 0.2.5, le bundle contient ses ressources et fonctionne aussi lorsque
+macOS utilise App Translocation. Au premier lancement, il initialise
+`config.toml`, `prioris.db`, `ObsidianVault/` et les liens vers les modèles dans
+`~/Library/Application Support/PRIORIS`. Par défaut, l'application est signée
+ad hoc gratuitement. Au
 premier blocage, ferme l'alerte, ouvre **Réglages Système > Confidentialité et
 sécurité**, puis clique sur **Ouvrir quand même** et confirme. La procédure
 bilingue complète est fournie dans `OUVRIR-MACOS.md`. Le lancement en terminal
 reste disponible avec `scripts/run.sh`. Sous Linux, utilise `scripts/run.sh` ;
 sous Windows, `scripts/run.ps1`. `SHA256SUMS.txt`, joint à la release, permet de
 vérifier l'intégrité des archives avant d'autoriser l'application.
+
+La configuration macOS réellement utilisée est
+`~/Library/Application Support/PRIORIS/config.toml`. Modifie-la depuis l'onglet
+**Configuration** ou dans ce dossier. Une erreur de démarrage est affichée et
+consignée dans `~/Library/Logs/PRIORIS/prioris.log` au lieu de provoquer une
+fermeture silencieuse.
 
 ## État fonctionnel
 
@@ -121,7 +130,8 @@ sauvegarde ; Telegram et le chemin SQLite nécessitent un redémarrage. Sous
 Unix, le fichier sauvegardé reçoit les permissions `0600`.
 
 Dans une archive distribuée, `scripts/run.sh` lance directement l'application.
-Sur macOS, il exécute le même Mach-O que `PRIORIS.app`. Sans secrets Apple, le
+Sur macOS, il exécute le même Mach-O que `PRIORIS.app` et utilise le même dossier
+Application Support. Sans secrets Apple, le
 workflow applique une signature ad hoc et inclut les instructions d'autorisation
 manuelle. Avec les six secrets, il exige la signature Developer ID, la
 notarisation, l'agrafage du ticket et l'évaluation Gatekeeper. Aucun script Rust

@@ -31,6 +31,14 @@ def test_rust_macos_release_supports_both_signing_modes() -> None:
     assert "steps.apple-creds.outputs.available == 'false'" in workflow
     assert 'codesign --force --sign - --options runtime --timestamp=none "$app"' in workflow
     assert "OUVRIR-MACOS.md" in workflow
+    assert 'mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"' in workflow
+    assert 'Contents/Resources/models' in workflow
+    assert 'Contents/Resources/config.toml' in workflow
+    assert 'Contents/Resources/ObsidianVault' in workflow
+    assert "Run macOS bundle runtime tests" in workflow
+    assert "Verify macOS bundle data initialization" in workflow
+    assert "--runtime-smoke" in workflow
+    assert 'test -L "$test_data/models/$MODEL_FILE"' in workflow
 
 
 def test_python_release_ignores_rust_release_tags() -> None:

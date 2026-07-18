@@ -211,8 +211,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
         run: |
           app="bundle/$BUNDLE_NAME/PRIORIS.app"
-          mkdir -p "$app/Contents/MacOS"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           mv "bundle/$BUNDLE_NAME/${{ matrix.binary }}" "$app/Contents/MacOS/prioris"
+          mv "bundle/$BUNDLE_NAME/models" "$app/Contents/Resources/models"
+          cp "bundle/$BUNDLE_NAME/config.toml" "$app/Contents/Resources/config.toml"
+          cp -R "bundle/$BUNDLE_NAME/ObsidianVault" "$app/Contents/Resources/ObsidianVault"
+          ln -s "PRIORIS.app/Contents/Resources/models" "bundle/$BUNDLE_NAME/models"
           version="${GITHUB_REF_NAME#rust-v}"
           cat > "$app/Contents/Info.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -235,6 +239,13 @@ jobs:
           PLIST
           plutil -lint "$app/Contents/Info.plist"
           test -x "$app/Contents/MacOS/prioris"
+          test -f "$app/Contents/Resources/config.toml"
+          test -f "$app/Contents/Resources/models/$MODEL_FILE"
+          test -d "$app/Contents/Resources/ObsidianVault"
+      - name: Run macOS bundle runtime tests
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        working-directory: rust
+        run: cargo test --locked --release --bin prioris --features "${{ matrix.features }}"
       - name: Import Apple Developer ID certificate
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'true'
         env:
@@ -293,6 +304,16 @@ jobs:
           xcrun stapler staple "$app"
           xcrun stapler validate "$app"
           spctl --assess --type execute --verbose=4 "$app"
+      - name: Verify macOS bundle data initialization
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        run: |
+          test_data="$RUNNER_TEMP/prioris-runtime-data"
+          PRIORIS_DATA_DIR="$test_data" \
+            "bundle/$BUNDLE_NAME/PRIORIS.app/Contents/MacOS/prioris" --runtime-smoke
+          test -f "$test_data/config.toml"
+          test -d "$test_data/ObsidianVault"
+          test -L "$test_data/models/$MODEL_FILE"
+          codesign --verify --deep --strict --verbose=2 "bundle/$BUNDLE_NAME/PRIORIS.app"
       - name: Verify bundled LLM (Unix)
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os != 'Windows'
         run: |

@@ -123,9 +123,10 @@ jobs:
 
       - name: Build app bundle
         run: |
-          mkdir -p bundle/prioris-linux-x64/runtime bundle/prioris-linux-x64/models
+          mkdir -p bundle/prioris-linux-x64/runtime bundle/prioris-linux-x64/models bundle/prioris-linux-x64/rust
           cp -R app/prioris app/tests app/ObsidianVault app/scripts bundle/prioris-linux-x64/
           cp app/pyproject.toml app/README.md app/README.en.md app/GUIDE.md app/GUIDE.en.md app/config.example.toml bundle/prioris-linux-x64/
+          cp app/rust/README.md bundle/prioris-linux-x64/rust/README.md
           cp app/config.release.toml bundle/prioris-linux-x64/config.toml
           cp -R runtime/linux-x64 bundle/prioris-linux-x64/runtime/
           curl -L --retry 3 --retry-delay 5 "$MODEL_3B_URL" -o "bundle/prioris-linux-x64/models/$MODEL_3B_FILE"
@@ -142,6 +143,7 @@ jobs:
           test -f prioris-linux-x64.tar.gz
           tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/config.toml"
           tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/tests/"
+          tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/rust/README.md"
           tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/ObsidianVault/"
           tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/runtime/linux-x64/llama-simple"
           tar -tzf prioris-linux-x64.tar.gz | grep -F "prioris-linux-x64/models/$MODEL_3B_FILE"
@@ -251,9 +253,10 @@ jobs:
 
       - name: Build app bundle
         run: |
-          mkdir -p bundle/prioris-macos-arm64/runtime bundle/prioris-macos-arm64/models
+          mkdir -p bundle/prioris-macos-arm64/runtime bundle/prioris-macos-arm64/models bundle/prioris-macos-arm64/rust
           cp -R app/prioris app/tests app/ObsidianVault app/scripts bundle/prioris-macos-arm64/
           cp app/pyproject.toml app/README.md app/README.en.md app/GUIDE.md app/GUIDE.en.md app/config.example.toml bundle/prioris-macos-arm64/
+          cp app/rust/README.md bundle/prioris-macos-arm64/rust/README.md
           cp app/config.release.toml bundle/prioris-macos-arm64/config.toml
           cp -R runtime/macos-arm64 bundle/prioris-macos-arm64/runtime/
           find bundle/prioris-macos-arm64/runtime/macos-arm64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --verify --verbose {} \;
@@ -271,6 +274,7 @@ jobs:
           test -f prioris-macos-arm64.zip
           unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/config.toml"
           unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/tests/"
+          unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/rust/README.md"
           unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/ObsidianVault/"
           unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/runtime/macos-arm64/llama-simple"
           unzip -l prioris-macos-arm64.zip | grep -F "prioris-macos-arm64/models/$MODEL_3B_FILE"
@@ -355,8 +359,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force bundle/prioris-windows-x64/runtime | Out-Null
           New-Item -ItemType Directory -Force bundle/prioris-windows-x64/models | Out-Null
+          New-Item -ItemType Directory -Force bundle/prioris-windows-x64/rust | Out-Null
           Copy-Item app/prioris, app/tests, app/ObsidianVault, app/scripts -Destination bundle/prioris-windows-x64 -Recurse
           Copy-Item app/pyproject.toml, app/README.md, app/README.en.md, app/GUIDE.md, app/GUIDE.en.md, app/config.example.toml -Destination bundle/prioris-windows-x64
+          Copy-Item app/rust/README.md -Destination bundle/prioris-windows-x64/rust/README.md
           Copy-Item app/config.release.toml -Destination bundle/prioris-windows-x64/config.toml
           Copy-Item runtime/windows-x64 -Destination bundle/prioris-windows-x64/runtime -Recurse
           Invoke-WebRequest -Uri $env:MODEL_3B_URL -OutFile "bundle/prioris-windows-x64/models/$env:MODEL_3B_FILE"
@@ -375,6 +381,7 @@ jobs:
           foreach ($required in @(
             "prioris-windows-x64/config.toml",
             "prioris-windows-x64/tests/",
+            "prioris-windows-x64/rust/README.md",
             "prioris-windows-x64/ObsidianVault/",
             "prioris-windows-x64/runtime/windows-x64/llama-simple.exe",
             "prioris-windows-x64/models/$env:MODEL_3B_FILE"

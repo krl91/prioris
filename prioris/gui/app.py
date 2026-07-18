@@ -399,6 +399,7 @@ class InterviewDialog(tk.Toplevel):
         axis = interpreted.get("axis")
         value = interpreted.get("value")
         reason = interpreted.get("reason") or "Aucune raison fournie."
+        outcome = interpreted.get("outcome", "correction" if axis else "no_change")
         uncertainty = int(interpreted.get("uncertainty") or 0)
         if axis is not None:
             ok = messagebox.askyesno(
@@ -413,6 +414,17 @@ class InterviewDialog(tk.Toplevel):
             else:
                 self.session = itv.set_axis_probe(
                     self.session, axis, int(value), uncertainty >= 2)
+        else:
+            title = (
+                "Prémisse contestée"
+                if outcome == "premise_false" else "Réponse enregistrée"
+            )
+            messagebox.showinfo(
+                title,
+                f"{reason}\n\n"
+                "Aucun axe n'est modifié et l'entretien continue.",
+                parent=self,
+            )
         db.record_answer(
             self.conn, self.interview_id,
             f"CHALLENGE_{self._challenge_index + 1}_{axis or 'NONE'}",

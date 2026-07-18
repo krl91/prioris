@@ -36,6 +36,9 @@ les options fournies.
 Règles absolues :
 - Tu ne calcules jamais de priorité, de score ou de classement.
 - Tu ne choisis qu'une option existante dans `options`.
+- Une conséquence explicitement grave, vitale ou mortelle soutient l'option la
+  plus forte correspondante. Une réponse courte mais claire n'est pas une
+  raison de t'abstenir.
 - Si la réponse est floue, choisis l'option la plus prudente et marque
   l'incertitude.
 - Tu réponds UNIQUEMENT en JSON strict, sans texte autour.
@@ -142,8 +145,21 @@ question de vérification de quadrant urgent/important.
 
 Règles absolues :
 - Tu ne calcules jamais la priorité finale.
+- La question a été générée par un LLM : sa prémisse peut être fausse. Ne la
+  considère jamais comme un fait établi.
+- Si l'utilisateur conteste explicitement la prémisse, utilise
+  status="premise_false" et explique quelle hypothèse est rejetée.
+- Une réponse brève « oui » ou « non » à une question fermée est complète :
+  utilise axis=null, status="ok", une confiance élevée et explique ce qui est
+  confirmé ou rejeté. Ne t'abstiens jamais uniquement parce que la réponse est
+  courte.
 - Tu proposes au plus une correction d'axe.
-- Tu ne modifies rien si la réponse ne contient pas de fait concret.
+- Une prémisse fausse ne suffit pas à inventer une correction. Propose un axe
+  seulement si la réponse apporte aussi un fait concret permettant de choisir
+  sa valeur.
+- Si la réponse est compréhensible mais ne permet aucune correction chiffrée,
+  utilise axis=null. Utilise status="abstain" seulement dans ce cas : la
+  réponse sera conservée et l'entretien continuera sans modification.
 - Tu privilégies :
   CDR pour vraie date limite ou coût du retard,
   INA pour conséquence de ne rien faire,
@@ -158,9 +174,15 @@ Règles absolues :
 
 Format :
 {"axis": "CDR|INA|BLK|IMP|HOR|IRR|ALN|null", "value": 0,
- "uncertainty": 0, "reason": "<raison courte>", "status": "ok|abstain",
+ "uncertainty": 0, "reason": "<raison courte>",
+ "status": "ok|premise_false|abstain",
  "confidence": <nombre de 0 à 1>}
-Sans fait concret, utilise axis=null et status="abstain"."""
+
+Exemple : à « Pourquoi est-elle urgente alors qu'aucune action immédiate
+n'est nécessaire ? », la réponse « C'est faux : je dois agir maintenant »
+conteste la prémisse. Retourne status="premise_false" ; ne propose un axe que
+si le reste de la réponse permet de le justifier. Sans fait assez précis,
+utilise axis=null, explique-le dans reason et n'invente aucune valeur."""
 
 
 def build_goal_match_payload(task_title: str,

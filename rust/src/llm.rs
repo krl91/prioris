@@ -15,7 +15,7 @@ use crate::{
 const INTERPRETER_SYSTEM: &str = "PRIORIS_INTERPRETER: Map the free answer to the supplied scale. Never calculate priority. Return only JSON with valeur, incertitude, reformulation, status (ok or abstain), confidence (0..1). Abstain when evidence is insufficient.";
 const QUESTION_SYSTEM: &str = "PRIORIS_QUESTION: Select exactly one supplied option from the free answer. Never calculate priority. Return only JSON with value, incertitude, reformulation, status, confidence. Abstain when no option is supported.";
 const CHALLENGE_SYSTEM: &str = "PRIORIS_CHALLENGE: Return exactly three short questions, one per future turn, that test deadline reality, social pressure or visibility, avoidance, and missing evidence behind the instinctive quadrant. Return only JSON with questions, status, confidence.";
-const CHALLENGE_ANSWER_SYSTEM: &str = "PRIORIS_CHALLENGE_ANSWER: Interpret one answer as at most one factual axis correction. Never calculate priority. Return only JSON with axis, value, uncertainty, reason, status, confidence. Use axis null and abstain without concrete evidence.";
+const CHALLENGE_ANSWER_SYSTEM: &str = "PRIORIS_CHALLENGE_ANSWER: Interpret one answer as at most one factual axis correction. Never calculate priority and never assume that the generated question's premise is true. Use status premise_false when the user rejects that premise. A brief yes or no is a complete answer to a closed question: use axis null, status ok, high confidence, and explain what is confirmed or rejected. Never abstain only because an answer is short. A false premise alone never justifies an invented score: return an axis only when the answer also contains enough factual evidence. Use axis null and abstain when no numeric correction is supported; this preserves the answer and continues the interview. Return only JSON with axis, value, uncertainty, reason, status (ok, premise_false, or abstain), confidence.";
 const IMPACT_SYSTEM: &str = "PRIORIS_IMPACT: Independently classify only the shortlisted task ids against the information. Never invent another id or calculate priority. If none matches, impacted is empty and propose a concise new task. Extract an explicit deadline as YYYY-MM-DD and answer direct questions briefly. Return only JSON with impacted, new_task_title, suggested_deadline, direct_answer, explanation, status, confidence.";
 
 #[derive(Debug, Error)]
@@ -57,6 +57,15 @@ pub struct ChallengeCorrection {
     pub value: u8,
     pub uncertainty: Uncertainty,
     pub reason: String,
+    pub outcome: ChallengeOutcome,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChallengeOutcome {
+    Correction,
+    PremiseFalse,
+    NoChange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -169,6 +178,9 @@ impl LlmService {
         options: &[(String, String)],
         answer: &str,
     ) -> Result<InterpretedOption, LlmError> {
+        if let Some(interpreted) = deterministic_option(options, answer) {
+            return Ok(interpreted);
+        }
         let payload = json!({
             "question_posee": question,
             "options": options.iter().map(|(label, value)| json!({"label": label, "value": value})).collect::<Vec<_>>(),
@@ -228,7 +240,22 @@ impl LlmService {
         question: &str,
         answer: &str,
     ) -> Result<ChallengeCorrection, LlmError> {
-        let value = self.json_chat(
+        if let Some(affirmative) = binary_answer(answer) {
+            return Ok(ChallengeCorrection {
+                axis: None,
+                value: 0,
+                uncertainty: Uncertainty::Certain,
+                reason: if affirmative {
+                    "Réponse affirmative explicite, sans fait permettant de chiffrer un axe."
+                        .to_owned()
+                } else {
+                    "Réponse négative explicite : l'hypothèse est rejetée, sans correction d'axe."
+                        .to_owned()
+                },
+                outcome: ChallengeOutcome::NoChange,
+            });
+        }
+        let value = self.raw_json_chat(
             CHALLENGE_ANSWER_SYSTEM,
             &json!({
                 "tache": task,
@@ -237,17 +264,58 @@ impl LlmService {
                 "reponse_utilisateur": answer,
             }),
         )?;
-        let axis = value["axis"]
+        let status = value["status"].as_str().unwrap_or("ok");
+        if !matches!(status, "ok" | "premise_false" | "abstain") {
+            return Err(LlmError::InvalidResponse(format!(
+                "unknown challenge status {status}"
+            )));
+        }
+        let confidence = value["confidence"].as_f64().unwrap_or(1.0);
+        if !(0.0..=1.0).contains(&confidence) {
+            return Err(LlmError::InvalidResponse(
+                "challenge confidence outside 0..1".to_owned(),
+            ));
+        }
+        let premise_false = status == "premise_false" || contests_premise(answer);
+        let no_reliable_correction = status == "abstain" || confidence < 0.55;
+        let axis = if no_reliable_correction {
+            None
+        } else {
+            value["axis"]
+                .as_str()
+                .filter(|value| *value != "null")
+                .map(str::parse)
+                .transpose()
+                .map_err(LlmError::InvalidResponse)?
+        };
+        let outcome = if premise_false {
+            ChallengeOutcome::PremiseFalse
+        } else if axis.is_some() {
+            ChallengeOutcome::Correction
+        } else {
+            ChallengeOutcome::NoChange
+        };
+        let reason = value["reason"]
             .as_str()
-            .filter(|value| *value != "null")
-            .map(str::parse)
-            .transpose()
-            .map_err(LlmError::InvalidResponse)?;
+            .filter(|reason| !reason.trim().is_empty())
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| match outcome {
+                ChallengeOutcome::PremiseFalse => {
+                    "La prémisse est contestée, sans fait suffisant pour modifier un axe."
+                        .to_owned()
+                }
+                _ => "Réponse conservée sans correction chiffrée.".to_owned(),
+            });
         let correction = ChallengeCorrection {
             axis,
             value: value["value"].as_u64().unwrap_or(0) as u8,
-            uncertainty: uncertainty(value["uncertainty"].as_u64().unwrap_or(0)),
-            reason: required_string(&value, "reason")?,
+            uncertainty: if no_reliable_correction {
+                Uncertainty::Unknown
+            } else {
+                uncertainty(value["uncertainty"].as_u64().unwrap_or(0))
+            },
+            reason,
+            outcome,
         };
         if correction
             .axis
@@ -316,10 +384,14 @@ impl LlmService {
     }
 
     fn json_chat(&self, system: &str, payload: &Value) -> Result<Value, LlmError> {
-        let text = self.chat(system, &payload.to_string())?;
-        let value = extract_json(&text)?;
+        let value = self.raw_json_chat(system, payload)?;
         ensure_confident(&value)?;
         Ok(value)
+    }
+
+    fn raw_json_chat(&self, system: &str, payload: &Value) -> Result<Value, LlmError> {
+        let text = self.chat(system, &payload.to_string())?;
+        extract_json(&text)
     }
 
     fn chat(&self, system: &str, user: &str) -> Result<String, LlmError> {
@@ -580,12 +652,14 @@ fn schema_for(system: &str) -> Value {
             vec!["questions", "status", "confidence"],
         )
     } else if system == CHALLENGE_ANSWER_SYSTEM {
+        let challenge_status =
+            json!({"type": "string", "enum": ["ok", "premise_false", "abstain"]});
         (
             json!({
                 "axis": {"type": ["string", "null"]},
                 "value": {"type": "integer", "minimum": 0, "maximum": 5},
                 "uncertainty": {"type": "integer", "minimum": 0, "maximum": 2},
-                "reason": {"type": "string"}, "status": status,
+                "reason": {"type": "string"}, "status": challenge_status,
                 "confidence": confidence
             }),
             vec![
@@ -637,6 +711,123 @@ fn ensure_confident(value: &Value) -> Result<(), LlmError> {
         return Err(LlmError::Abstained);
     }
     Ok(())
+}
+
+fn contests_premise(answer: &str) -> bool {
+    let normalized = answer.to_lowercase().replace(['’', '\''], " ");
+    [
+        "premisse fausse",
+        "prémisse fausse",
+        "question fausse",
+        "information fausse",
+        "hypothese fausse",
+        "hypothèse fausse",
+        "ce n est pas vrai",
+        "c est faux",
+        "au contraire",
+    ]
+    .iter()
+    .any(|phrase| normalized.contains(phrase))
+}
+
+fn binary_answer(answer: &str) -> Option<bool> {
+    let normalized = normalize_short_text(answer);
+    match normalized.as_str() {
+        "non" | "no" | "pas du tout" | "absolument pas" | "aucunement" => Some(false),
+        "oui" | "yes" | "si" | "tout a fait" | "absolument" => Some(true),
+        _ => None,
+    }
+}
+
+fn normalize_short_text(text: &str) -> String {
+    text.to_lowercase()
+        .replace(['’', '\'', '.', '!', '?', ',', ':', ';'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn deterministic_option(options: &[(String, String)], answer: &str) -> Option<InterpretedOption> {
+    let normalized = normalize_short_text(answer);
+    let normalized_options = options
+        .iter()
+        .map(|(label, value)| (normalize_short_text(label), value))
+        .collect::<Vec<_>>();
+    let find = |fragments: &[&str]| {
+        normalized_options
+            .iter()
+            .find(|(label, _)| fragments.iter().any(|fragment| label.contains(fragment)))
+            .map(|(_, value)| (*value).clone())
+    };
+    let mut meaning = "l'option indiquée";
+    let mut value = normalized_options
+        .iter()
+        .find(|(label, _)| label == &normalized)
+        .map(|(_, value)| (*value).clone());
+    if value.is_none()
+        && let Some(affirmative) = binary_answer(answer)
+    {
+        value = if affirmative {
+            find(&["oui", "yes"])
+        } else {
+            find(&["non", "no"])
+        };
+        meaning = if affirmative {
+            "une réponse affirmative"
+        } else {
+            "une réponse négative"
+        };
+    }
+    if value.is_none()
+        && [
+            "je ne sais pas",
+            "aucune idée",
+            "aucune idee",
+            "impossible à dire",
+        ]
+        .iter()
+        .any(|phrase| normalized.contains(phrase))
+    {
+        value = find(&["sais pas", "aucune idée", "aucune idee", "inconnu"]);
+        meaning = "une incertitude explicite";
+    }
+    let true_problem = find(&["vrai problème", "vrai probleme"]);
+    let harmless_option = find(&["rien de grave"]);
+    if value.is_none() && true_problem.is_some() && harmless_option.is_some() {
+        let harmless = [
+            "rien de grave",
+            "pas grave",
+            "aucun problème",
+            "aucun probleme",
+            "aucune conséquence",
+            "aucune consequence",
+            "peut attendre",
+            "sans conséquence",
+            "sans consequence",
+        ]
+        .iter()
+        .any(|phrase| normalized.contains(phrase));
+        let severe = [
+            "meurs", "meurt", "mourir", "mort", "vital", "vitale", "survie", "danger", "grave",
+        ]
+        .iter()
+        .any(|word| normalized.split_whitespace().any(|token| token == *word))
+            || ["pour vivre", "risque de mourir", "besoin de manger"]
+                .iter()
+                .any(|phrase| normalized.contains(phrase));
+        if harmless {
+            value = harmless_option;
+            meaning = "aucune conséquence grave";
+        } else if severe {
+            value = true_problem;
+            meaning = "une conséquence grave ou vitale";
+        }
+    }
+    value.map(|value| InterpretedOption {
+        value,
+        uncertainty: Uncertainty::Certain,
+        reformulation: format!("Tu indiques clairement {meaning}."),
+    })
 }
 
 fn shortlist_tasks(tasks: &[(i64, String)], information: &str, limit: usize) -> Vec<(i64, String)> {
@@ -757,18 +948,22 @@ fn builtin_chat(system: &str, user: &str) -> String {
             .to_string()
         }
         CHALLENGE_ANSWER_SYSTEM => {
+            let premise_false = contests_premise(&answer);
+            let status = if premise_false { "premise_false" } else { "ok" };
             if ["deadline", "échéance", "demain", "ce soir", "retard"]
                 .iter()
                 .any(|word| answer.contains(word))
             {
-                json!({"axis":"CDR","value":3,"uncertainty":0,"reason":"Une échéance ou un coût du retard est mentionné."}).to_string()
+                json!({"axis":"CDR","value":3,"uncertainty":0,"reason":"Une échéance ou un coût du retard est mentionné.","status":status,"confidence":0.85}).to_string()
             } else if ["bloque", "attend", "dépend"]
                 .iter()
                 .any(|word| answer.contains(word))
             {
-                json!({"axis":"BLK","value":4,"uncertainty":0,"reason":"Un blocage concret est mentionné."}).to_string()
+                json!({"axis":"BLK","value":4,"uncertainty":0,"reason":"Un blocage concret est mentionné.","status":status,"confidence":0.85}).to_string()
+            } else if premise_false {
+                json!({"axis":null,"value":0,"uncertainty":1,"reason":"La réponse conteste la prémisse, sans fait suffisant pour modifier un axe.","status":"premise_false","confidence":0.9}).to_string()
             } else {
-                json!({"axis":null,"value":0,"uncertainty":1,"reason":"Aucun fait assez précis pour corriger un axe."}).to_string()
+                json!({"axis":null,"value":0,"uncertainty":2,"reason":"Aucun fait assez précis pour corriger un axe.","status":"abstain","confidence":0.4}).to_string()
             }
         }
         IMPACT_SYSTEM => {
@@ -823,5 +1018,88 @@ mod tests {
     fn interpretation_budget_leaves_room_for_complete_json() {
         assert_eq!(token_budget(INTERPRETER_SYSTEM, 512), 160);
         assert_eq!(token_budget(QUESTION_SYSTEM, 120), 120);
+    }
+
+    #[test]
+    fn challenge_false_premise_is_valid_without_axis_correction() {
+        let config = LlmConfig {
+            enabled: true,
+            ..LlmConfig::default()
+        };
+        let llm = LlmService::new(config);
+        let correction = llm
+            .interpret_challenge(
+                "Manger",
+                "P1",
+                "Pourquoi aucune action immédiate ?",
+                "La question comporte une information fausse.",
+            )
+            .unwrap();
+        assert_eq!(correction.axis, None);
+        assert_eq!(correction.outcome, ChallengeOutcome::PremiseFalse);
+    }
+
+    #[test]
+    fn challenge_abstention_is_non_blocking() {
+        let config = LlmConfig {
+            enabled: true,
+            ..LlmConfig::default()
+        };
+        let llm = LlmService::new(config);
+        let correction = llm
+            .interpret_challenge("Tâche", "P2", "Pourquoi ?", "Je ne sais pas encore.")
+            .unwrap();
+        assert_eq!(correction.axis, None);
+        assert_eq!(correction.outcome, ChallengeOutcome::NoChange);
+        assert_eq!(correction.uncertainty, Uncertainty::Unknown);
+    }
+
+    #[test]
+    fn false_premise_with_fact_keeps_a_confirmable_correction() {
+        let config = LlmConfig {
+            enabled: true,
+            ..LlmConfig::default()
+        };
+        let llm = LlmService::new(config);
+        let correction = llm
+            .interpret_challenge(
+                "Manger",
+                "P1",
+                "Pourquoi aucune action immédiate ?",
+                "C'est faux : je dois agir avant la deadline de ce soir.",
+            )
+            .unwrap();
+        assert_eq!(correction.axis, Some(Axis::CDR));
+        assert_eq!(correction.value, 3);
+        assert_eq!(correction.outcome, ChallengeOutcome::PremiseFalse);
+    }
+
+    #[test]
+    fn short_no_is_a_certain_non_blocking_answer() {
+        let config = LlmConfig {
+            enabled: true,
+            ..LlmConfig::default()
+        };
+        let llm = LlmService::new(config);
+        let correction = llm
+            .interpret_challenge("Manager", "P1", "Y a-t-il une pression sociale ?", "non")
+            .unwrap();
+        assert_eq!(correction.axis, None);
+        assert_eq!(correction.uncertainty, Uncertainty::Certain);
+        assert_eq!(correction.outcome, ChallengeOutcome::NoChange);
+    }
+
+    #[test]
+    fn clear_vital_consequence_selects_real_problem_without_model() {
+        let options = vec![
+            ("Un vrai problème".to_owned(), "0".to_owned()),
+            ("Rien de grave, en fait".to_owned(), "1".to_owned()),
+            ("Je ne sais pas".to_owned(), "2".to_owned()),
+        ];
+        let interpreted =
+            deterministic_option(&options, "je meurt car j'ai besoin de manger pour vivre")
+                .unwrap();
+        assert_eq!(interpreted.value, "0");
+        assert_eq!(interpreted.uncertainty, Uncertainty::Certain);
     }
 }

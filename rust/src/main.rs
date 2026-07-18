@@ -105,8 +105,41 @@ fn llm_smoke(model: PathBuf) -> anyhow::Result<()> {
             prioris::core::Axis::IMP.question_fr(),
             "Une différence majeure et clairement mesurable.",
         )?;
+        let challenge = service.interpret_challenge(
+            "Manger",
+            "P1",
+            "Pourquoi aucune action immédiate n'est-elle nécessaire ?",
+            "La question comporte une information fausse.",
+        )?;
+        anyhow::ensure!(
+            challenge.outcome == prioris::llm::ChallengeOutcome::PremiseFalse,
+            "the embedded model did not preserve a challenged premise"
+        );
+        let binary = service.interpret_challenge(
+            "Manager",
+            "P1",
+            "Y a-t-il une pression sociale ?",
+            "non",
+        )?;
+        anyhow::ensure!(
+            binary.axis.is_none() && binary.uncertainty == prioris::core::Uncertainty::Certain,
+            "a short no must be accepted without an invented score"
+        );
+        let mirror = service.interpret_option(
+            "Si tu attendais une semaine, que se passerait-il ?",
+            &[
+                ("Un vrai problème".to_owned(), "0".to_owned()),
+                ("Rien de grave, en fait".to_owned(), "1".to_owned()),
+                ("Je ne sais pas".to_owned(), "2".to_owned()),
+            ],
+            "je meurt car j'ai besoin de manger pour vivre",
+        )?;
+        anyhow::ensure!(
+            mirror.value == "0" && mirror.uncertainty == prioris::core::Uncertainty::Certain,
+            "a clear vital consequence must select the strongest mirror option"
+        );
         println!(
-            "PRIORIS Rust embedded LLM: OK ({latency} ms, IMP={})",
+            "PRIORIS Rust embedded LLM: OK ({latency} ms, IMP={}, false premise, short no and mirror accepted)",
             interpreted.value
         );
         Ok(())

@@ -372,7 +372,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `215 passed`.
+Résultat attendu : `224 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,7 +391,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `215 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `224 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.6 Rappels pour Obsidian et Windows
@@ -1182,6 +1182,50 @@ Exemple : `IMP=2` hésitant donne `[1,3]`, soit une amplitude de
 sont possibles et `IMP` est l'axe à clarifier en premier. Si aucun seuil n'est
 traversé, le quadrant est robuste même si une réponse était hésitante.
 
+**Questions anti-biais et prémisse fausse.** Les trois questions formulées par
+le LLM sont des hypothèses de vérification, pas des faits. Elles sont posées une
+par une après les questions factuelles. Pour chaque réponse, l'interpréteur
+produit exactement l'un de ces résultats :
+
+1. `correction` : un fait permet de proposer au plus un axe et une valeur ; la
+   GUI ou Telegram explique la proposition et attend la confirmation avant de
+   modifier le calcul ;
+2. `premise_false` : la réponse rejette une hypothèse contenue dans la question ;
+   elle est conservée dans l'historique. Sans autre fait exploitable, aucun axe
+   n'est modifié et l'entretien passe à la question suivante ;
+3. `no_change` : le LLM s'abstient ou sa confiance est inférieure à `0,55` ; la
+   réponse est conservée avec une incertitude forte, aucun chiffre n'est
+   inventé et l'entretien continue.
+
+Cas particulier déterministe : une réponse réduite à `oui`, `non` ou une
+variante non ambiguë (`pas du tout`, `tout à fait`) est complète pour une
+question fermée. PRIORIS la reconnaît avant l'appel au LLM, l'enregistre avec
+une incertitude nulle et continue avec `no_change`, car confirmer ou rejeter une
+hypothèse ne fournit pas à lui seul une valeur numérique pour un axe. Exemple :
+à « Y a-t-il une pression sociale qui influence P1 ? », `non` signifie que ce
+biais proposé est rejeté ; ce n'est ni une panne ni une raison de modifier
+`CDR`, `IMP` ou un autre axe.
+
+La dernière question miroir dispose du même garde-fou conservateur. Lorsque ses
+options sont exactement « Un vrai problème », « Rien de grave, en fait » et
+« Je ne sais pas », une conséquence explicitement mortelle, vitale ou grave est
+classée dans la première option avec une incertitude nulle. Par exemple « je
+meurs car j'ai besoin de manger pour vivre » soutient « Un vrai problème ».
+« Il ne se passerait rien de grave » soutient la seconde option. Sans marqueur
+fort, le repli ne choisit rien et laisse le LLM ou les boutons traiter la
+réponse. L'interprétation reste affichée et soumise à confirmation avant toute
+correction issue de la question miroir.
+
+Exemple : « Pourquoi cette tâche est-elle urgente alors qu'elle ne nécessite
+pas d'action immédiate ? » contient une hypothèse. « Cette information est
+fausse : je dois agir maintenant » produit au minimum `premise_false`. Si la
+suite précise « avant 12 h, sinon je perds le créneau », le LLM peut en plus
+proposer une correction de `CDR`, que l'utilisateur doit confirmer. « La
+prémisse est fausse » seule ne suffit jamais à choisir arbitrairement une
+valeur. Ainsi, toute réponse est utilisée soit comme fait confirmé dans les
+axes, soit comme trace d'audit ; seules les valeurs confirmées entrent dans les
+formules `U`, `I` et `G`.
+
 **Paramètres qui ne rentrent pas directement dans le score.**
 
 | Paramètre | Question ou origine | Utilisation réelle | Exemple |
@@ -1405,6 +1449,7 @@ scores à la main.
 | Pas d'export Obsidian | `vault_path` vide ou faux | chemin absolu du vault dans `config.toml` |
 | Plan vide | tâches en P4, estimations « inconnue », ou énergie très faible | `/list` pour voir l'état ; estimer les tâches ; c'est peut-être un plan honnête |
 | Entretien bloqué | session mémoire perdue (redémarrage) | relancer `/add` — rien n'est corrompu, SQLite est la source de vérité |
+| Une question anti-biais contient une prémisse fausse | question générée trop affirmative | répondre librement « la prémisse est fausse » et préciser le fait correct si possible ; la contestation est enregistrée et l'entretien continue sans inventer de score |
 | « Je n'ai pas pu interpréter » systématique | Ollama pas lancé, nom de modèle inexact, ou 1er appel (chargement du modèle) | `/llm` dans Telegram : test aller-retour + cause exacte ; `ollama list` pour le nom ; réessayer après le 1er chargement |
 
 ---
@@ -1433,7 +1478,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 215 tests automatisés passent localement dans le dépôt source
+**État tests** : 224 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

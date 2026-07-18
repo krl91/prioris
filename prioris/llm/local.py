@@ -303,6 +303,37 @@ def _subjective_challenge(payload: dict) -> dict:
 
 def _challenge_answer(payload: dict) -> dict:
     text = _norm(payload.get("reponse_utilisateur", ""))
+    if text in ("non", "no", "pas du tout", "absolument pas", "aucunement"):
+        return {
+            "axis": None,
+            "value": 0,
+            "uncertainty": 0,
+            "reason": (
+                "Réponse négative explicite : l'hypothèse est rejetée, sans "
+                "correction d'axe nécessaire."
+            ),
+            "status": "ok",
+            "confidence": 1.0,
+        }
+    if text in ("oui", "yes", "si", "tout a fait", "absolument"):
+        return {
+            "axis": None,
+            "value": 0,
+            "uncertainty": 0,
+            "reason": (
+                "Réponse affirmative explicite, sans élément permettant de "
+                "chiffrer un axe."
+            ),
+            "status": "ok",
+            "confidence": 1.0,
+        }
+    premise_false = any(phrase in text for phrase in (
+        "premisse est fausse", "premisse fausse", "question est fausse",
+        "question fausse", "ce n est pas vrai", "c est faux", "au contraire",
+        "ce n'est pas vrai", "c'est faux",
+        "si il faut", "si je dois", "elle necessite", "il faut agir maintenant",
+    ))
+    status = "premise_false" if premise_false else "ok"
     if any(word in text for word in ("deadline", "echeance", "échéance", "retard", "ce soir",
                                      "demain", "aujourd hui", "aujourd'hui")):
         return {
@@ -310,6 +341,8 @@ def _challenge_answer(payload: dict) -> dict:
             "value": 3,
             "uncertainty": 0,
             "reason": "La réponse mentionne une échéance ou un coût du retard.",
+            "status": status,
+            "confidence": 0.85,
         }
     if any(word in text for word in ("bloque", "bloqué", "attend", "depend", "dépend")):
         return {
@@ -317,6 +350,8 @@ def _challenge_answer(payload: dict) -> dict:
             "value": 4,
             "uncertainty": 0,
             "reason": "La réponse indique un blocage concret.",
+            "status": status,
+            "confidence": 0.85,
         }
     if any(word in text for word in ("impact", "important", "benefice", "bénéfice", "objectif")):
         return {
@@ -324,12 +359,28 @@ def _challenge_answer(payload: dict) -> dict:
             "value": 2,
             "uncertainty": 1,
             "reason": "La réponse indique un impact mais reste peu quantifiée.",
+            "status": status,
+            "confidence": 0.7,
+        }
+    if premise_false:
+        return {
+            "axis": None,
+            "value": 0,
+            "uncertainty": 1,
+            "reason": (
+                "La réponse conteste la prémisse de la question, sans fournir "
+                "assez d'éléments pour modifier un axe."
+            ),
+            "status": "premise_false",
+            "confidence": 0.9,
         }
     return {
         "axis": None,
         "value": 0,
-        "uncertainty": 1,
+        "uncertainty": 2,
         "reason": "La réponse ne contient pas de fait exploitable pour corriger un axe.",
+        "status": "abstain",
+        "confidence": 0.4,
     }
 
 

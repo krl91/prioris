@@ -642,6 +642,7 @@ def test_interpret_challenge_answer_valide_et_journalise():
         "value": 3,
         "uncertainty": 0,
         "reason": "Une échéance réelle est mentionnée.",
+        "outcome": "correction",
     }
     assert calls == [("challenge_answer", "m", True)]
 
@@ -654,6 +655,131 @@ def test_interpret_challenge_answer_prioris_local():
     assert parsed is not None
     assert parsed["axis"] == "CDR"
     assert parsed["value"] == 3
+
+
+def test_interpret_challenge_accepte_premisse_fausse_sans_correction():
+    raw = json.dumps({
+        "axis": None,
+        "value": 0,
+        "uncertainty": 1,
+        "reason": "La question suppose à tort qu'aucune action n'est nécessaire.",
+        "status": "premise_false",
+        "confidence": 0.91,
+    })
+    facade = LLMFacade(
+        ChatClient(LLMConfig(enabled=True, provider="ollama", model="m"),
+                   fake_transport(raw)))
+
+    parsed = facade.interpret_challenge_answer(
+        "Manger", "P1", "Pourquoi aucune action immédiate ?",
+        "Cette information est fausse.", {})
+
+    assert parsed is not None
+    assert parsed["axis"] is None
+    assert parsed["outcome"] == "premise_false"
+    assert facade.last_error is None
+
+
+def test_interpret_challenge_abstention_ne_bloque_pas_entretien():
+    raw = json.dumps({
+        "axis": None,
+        "value": 0,
+        "uncertainty": 1,
+        "reason": "Pas assez d'éléments pour chiffrer un axe.",
+        "status": "abstain",
+        "confidence": 0.3,
+    })
+    facade = LLMFacade(
+        ChatClient(LLMConfig(enabled=True, provider="ollama", model="m"),
+                   fake_transport(raw)))
+
+    parsed = facade.interpret_challenge_answer(
+        "Manger", "P1", "Pourquoi aucune action immédiate ?",
+        "La question comporte une information fausse.", {})
+
+    assert parsed is not None
+    assert parsed["axis"] is None
+    assert parsed["uncertainty"] == 2
+    assert parsed["outcome"] == "premise_false"
+    assert facade.last_error is None
+
+
+def test_interpret_challenge_local_reconnait_premisse_fausse():
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="prioris", model="rules-v1")))
+
+    parsed = facade.interpret_challenge_answer(
+        "Manger", "P1", "Pourquoi aucune action immédiate ?",
+        "C'est faux, la prémisse est fausse.", {})
+
+    assert parsed is not None
+    assert parsed["axis"] is None
+    assert parsed["outcome"] == "premise_false"
+
+
+def test_premisse_fausse_avec_fait_propose_une_correction_confirmable():
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="prioris", model="rules-v1")))
+
+    parsed = facade.interpret_challenge_answer(
+        "Manger", "P1", "Pourquoi aucune action immédiate ?",
+        "C'est faux : je dois agir avant la deadline de ce soir.", {})
+
+    assert parsed is not None
+    assert parsed["axis"] == "CDR"
+    assert parsed["value"] == 3
+    assert parsed["outcome"] == "premise_false"
+
+
+@pytest.mark.parametrize(("answer", "expected_word"), [
+    ("non", "négative"),
+    ("oui", "affirmative"),
+])
+def test_reponse_binaire_challenge_est_certaine_et_n_appelle_pas_llm(
+        answer, expected_word):
+    transport = fake_transport("ne doit pas être utilisé")
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="ollama", model="m"), transport))
+
+    parsed = facade.interpret_challenge_answer(
+        "Manager", "P1", "Y a-t-il une pression sociale ?", answer, {})
+
+    assert parsed is not None
+    assert parsed["axis"] is None
+    assert parsed["uncertainty"] == 0
+    assert parsed["outcome"] == "no_change"
+    assert expected_word in parsed["reason"]
+    assert transport.calls == []
+    assert facade.last_error is None
+
+
+@pytest.mark.parametrize(("answer", "expected_value"), [
+    ("je meurt car j'ai besoin de manger pour vivre", "0"),
+    ("Il ne se passerait rien de grave, ça peut attendre", "1"),
+])
+def test_question_miroir_consequence_claire_sans_abstention_llm(
+        answer, expected_value):
+    transport = fake_transport(json.dumps({
+        "value": "2", "incertitude": 2, "reformulation": "Incertain.",
+        "status": "abstain", "confidence": 0.1,
+    }))
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="ollama", model="m"), transport))
+    options = [
+        ("Un vrai problème", "0"),
+        ("Rien de grave, en fait", "1"),
+        ("Je ne sais pas", "2"),
+    ]
+
+    parsed = facade.interpret_question_answer(
+        "Si tu attendais une semaine, que se passerait-il ?",
+        options, answer)
+
+    assert parsed is not None
+    assert parsed.value == expected_value
+    assert parsed.incertitude == 0
+    assert transport.calls == []
+    assert facade.last_error is None
 
 
 def test_extract_json_texte_parasite():

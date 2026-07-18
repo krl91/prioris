@@ -82,7 +82,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             215 tests automatisés
+tests/             224 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -161,7 +161,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `215 passed`.
+Résultat attendu dans un clone complet du dépôt source : `224 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -244,7 +244,14 @@ réponse à « Instinctivement, tu la classes comment ? » ne force pas le score
 elle prépare des questions de challenge anti-biais. Elles sont posées une par
 une après les questions factuelles, juste avant le calcul. Chaque réponse peut
 proposer une correction d'axe, expliquée puis confirmée avant d'entrer dans le
-calcul.
+calcul. Une question LLM peut contenir une prémisse fausse : réponds-le
+librement. PRIORIS enregistre alors la contestation et continue sans modifier
+le score ; si la réponse apporte aussi un fait chiffrable, il propose la
+correction correspondante. Une abstention du LLM ne bloque jamais ces
+questions anti-biais. Les réponses courtes `oui` et `non` sont reconnues
+directement comme réponses complètes et certaines. La vérification miroir
+reconnaît aussi les conséquences explicitement graves ou vitales sans convertir
+les réponses ambiguës en choix arbitraires.
 
 ### Calcul et planification
 
@@ -318,7 +325,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-215 tests passent localement. Les améliorations restantes envisagées sont :
+224 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

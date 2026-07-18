@@ -58,3 +58,14 @@ def test_challenges_places_apres_entretien_factuel():
                    bot.index("async def _finish_interview")]
     assert bot_flow.index("itv.next_question") < bot_flow.index(
         "_ask_challenge_question")
+
+
+def test_abstention_challenge_continue_sans_modifier_un_axe():
+    root = Path(__file__).parent.parent
+    gui = (root / "prioris/gui/app.py").read_text(encoding="utf-8")
+    bot = (root / "prioris/bot/handlers.py").read_text(encoding="utf-8")
+
+    assert "Aucun axe n'est modifié et l'entretien continue." in gui
+    assert "Aucun axe n'est modifié ; l'entretien continue." in bot
+    assert 'outcome == "premise_false"' in gui
+    assert 'outcome == "premise_false"' in bot

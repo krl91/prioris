@@ -11,11 +11,11 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.2.1 |
+| Système | Archive Rust 0.2.2 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.2.1-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.2.1-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.2.1-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.2.2-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.2.2-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.2.2-linux-x64.tar.gz` |
 
 Décompresse l'archive puis lance `scripts/run.sh` sous macOS/Linux ou
 `scripts/run.ps1` sous Windows. Le modèle Ministral 3B, `config.toml` et
@@ -38,6 +38,12 @@ La version Rust fournit :
 - les réponses libres LLM avec proposition avant validation dans la GUI ;
 - trois questions anti-biais LLM posées successivement et intégrées au calcul
   uniquement après confirmation ;
+- les prémisses fausses et abstentions sont conservées sans bloquer
+  l'entretien ni inventer une correction d'axe ;
+- les réponses fermées `oui`/`non` sont reconnues avec certitude sans appel
+  inutile au modèle ;
+- les conséquences miroir explicitement graves ou vitales sont associées à
+  l'option forte, tandis que les réponses ambiguës restent sans choix forcé ;
 - les catégories personnalisées persistantes ;
 - les objectifs, `/list`, `/today`, `/done`, `/scan`, `/info` et `/llm` ;
 - le scan, l'annotation et l'export Markdown Obsidian ;
@@ -46,7 +52,7 @@ La version Rust fournit :
 - la génération JSON contrainte par schéma pour le GGUF embarqué, les budgets
   de tokens par appel, l'abstention explicite et la présélection `/info`.
 
-Limites actuelles par rapport à la version Python 0.5.2 :
+Limites actuelles par rapport à la version Python 0.5.3 :
 
 - Telegram utilise des réponses numérotées et ne propose pas encore les mêmes
   boutons de confirmation que la GUI ;

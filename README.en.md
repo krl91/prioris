@@ -152,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `215 passed`.
+Expected result in a full source repository clone: `224 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -231,7 +231,14 @@ LLM is down/offline, the UI falls back to buttons. The answer to “Instinctivel
 how would you classify it?” does not force the score: it prepares anti-bias
 challenge questions. They are asked one at a time after the factual questions,
 just before scoring. Each answer may propose an axis correction, which is
-explained and confirmed before it can affect the calculation.
+explained and confirmed before it can affect the calculation. An LLM-generated
+question may have a false premise: state that freely. PRIORIS records the
+objection and continues without changing the score; if the answer also gives a
+scorable fact, it proposes the corresponding correction. LLM abstention never
+blocks an anti-bias question. Short `yes` and `no` answers are recognized
+directly as complete, certain answers. The mirror check also recognizes
+explicitly severe or vital consequences without forcing ambiguous answers into
+an arbitrary option.
 
 ### Calculation And Planning
 
@@ -305,7 +312,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-215 tests pass locally. Remaining possible improvements: advanced scenario
+224 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

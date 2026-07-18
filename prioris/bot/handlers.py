@@ -895,6 +895,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         value = interpreted.get("value")
         uncertainty = int(interpreted.get("uncertainty") or 0)
         reason = interpreted.get("reason") or "Aucune raison fournie."
+        outcome = interpreted.get("outcome", "correction" if axis else "no_change")
         state["awaiting_challenge_answer"] = False
         if axis is None:
             db.record_answer(
@@ -902,7 +903,12 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 f"CHALLENGE_{idx + 1}_NONE", None,
                 f"{question}\n\n{text}\n\n{reason}", uncertainty)
             state["challenge_index"] = idx + 1
-            await update.message.reply_text(f"Noté. {reason}")
+            prefix = (
+                "Prémisse contestée et réponse notée."
+                if outcome == "premise_false" else "Réponse notée."
+            )
+            await update.message.reply_text(
+                f"{prefix} {reason}\nAucun axe n'est modifié ; l'entretien continue.")
             await _ask_challenge_question(update.message, context, state)
             return
         state["pending_challenge_update"] = {

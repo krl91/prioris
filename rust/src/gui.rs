@@ -9,7 +9,7 @@ use crate::{
         Effort, Estimate, InterviewSession, Priority, Question, ScoreResult, Uncertainty,
         build_day_plan, question_axis, score,
     },
-    llm::{ChallengeCorrection, ImpactProposal, LlmService},
+    llm::{ChallengeCorrection, ChallengeOutcome, ImpactProposal, LlmService},
     store::{Category, Store},
     vault::{self, VaultTask},
 };
@@ -880,6 +880,9 @@ fn render_add_flow(
         ));
         ui.heading(question.clone());
         if let Some(correction) = flow.pending_correction.take() {
+            if correction.outcome == ChallengeOutcome::PremiseFalse {
+                ui.label("La prémisse de la question est contestée.");
+            }
             ui.label(&correction.reason);
             if let Some(axis) = correction.axis {
                 ui.label(format!(
@@ -889,25 +892,34 @@ fn render_add_flow(
                 ));
             }
             let mut keep = true;
-            ui.horizontal(|ui| {
-                if ui.button("Appliquer").clicked() {
-                    if let Some(axis) = correction.axis {
-                        let _ = flow.session.set_axis_probe(
-                            axis,
-                            correction.value,
-                            correction.uncertainty,
-                        );
+            if correction.axis.is_some() {
+                ui.horizontal(|ui| {
+                    if ui.button("Appliquer").clicked() {
+                        if let Some(axis) = correction.axis {
+                            let _ = flow.session.set_axis_probe(
+                                axis,
+                                correction.value,
+                                correction.uncertainty,
+                            );
+                        }
+                        flow.challenge_index += 1;
+                        flow.challenge_answer.clear();
+                        keep = false;
                     }
+                    if ui.button("Ne pas appliquer").clicked() {
+                        flow.challenge_index += 1;
+                        flow.challenge_answer.clear();
+                        keep = false;
+                    }
+                });
+            } else {
+                ui.label("Aucun axe n'est modifié. La réponse est conservée.");
+                if ui.button("Continuer").clicked() {
                     flow.challenge_index += 1;
                     flow.challenge_answer.clear();
                     keep = false;
                 }
-                if ui.button("Ignorer").clicked() {
-                    flow.challenge_index += 1;
-                    flow.challenge_answer.clear();
-                    keep = false;
-                }
-            });
+            }
             if keep {
                 flow.pending_correction = Some(correction);
             }
@@ -922,7 +934,10 @@ fn render_add_flow(
                     &question,
                     &flow.challenge_answer,
                 ) {
-                    Ok(value) => flow.pending_correction = Some(value),
+                    Ok(value) => {
+                        flow.error.clear();
+                        flow.pending_correction = Some(value);
+                    }
                     Err(error) => flow.error = error.to_string(),
                 }
             }

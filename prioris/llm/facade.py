@@ -12,6 +12,7 @@ import json
 import re
 import time
 import datetime as dt
+import unicodedata
 from dataclasses import dataclass
 from typing import Callable
 
@@ -82,6 +83,107 @@ def _require_confidence(data: dict, minimum: float = 0.55) -> None:
         raise ValueError(f"confiance insuffisante : {confidence}")
 
 
+def _normalize_free_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text.casefold())
+    normalized = "".join(
+        char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
+
+
+def _contests_premise(text: str) -> bool:
+    """Recognize an explicit rejection even when a small model abstains."""
+    normalized = _normalize_free_text(text)
+    return any(phrase in normalized for phrase in (
+        "premisse fausse",
+        "premisse est fausse",
+        "question fausse",
+        "question est fausse",
+        "information fausse",
+        "hypothese fausse",
+        "ce n est pas vrai",
+        "c est faux",
+        "au contraire",
+    ))
+
+
+def _binary_answer(text: str) -> bool | None:
+    """Return an unambiguous short yes/no answer, otherwise None."""
+    normalized = _normalize_free_text(text)
+    if normalized in {"non", "no", "pas du tout", "absolument pas", "aucunement"}:
+        return False
+    if normalized in {"oui", "yes", "si", "tout a fait", "absolument"}:
+        return True
+    return None
+
+
+def _deterministic_question_answer(
+    options: list[tuple[str, str]],
+    user_text: str,
+    language: str,
+) -> InterpretedQuestionAnswer | None:
+    """Resolve only unambiguous option answers before invoking a model."""
+    normalized = _normalize_free_text(user_text)
+    normalized_options = [
+        (_normalize_free_text(label), value) for label, value in options
+    ]
+
+    def find_option(*fragments: str) -> str | None:
+        for label, value in normalized_options:
+            if any(fragment in label for fragment in fragments):
+                return value
+        return None
+
+    exact = next(
+        (value for label, value in normalized_options if normalized == label),
+        None,
+    )
+    binary = _binary_answer(user_text)
+    if exact is not None:
+        value, meaning = exact, "l'option indiquée"
+    elif binary is not None:
+        value = find_option("oui") if binary else find_option("non")
+        meaning = "une réponse affirmative" if binary else "une réponse négative"
+    elif any(phrase in normalized for phrase in (
+            "je ne sais pas", "aucune idee", "impossible a dire")):
+        value = find_option("sais pas", "aucune idee", "inconnu")
+        meaning = "une incertitude explicite"
+    else:
+        value = None
+        meaning = ""
+
+    is_mirror_consequence = (
+        find_option("vrai probleme") is not None
+        and find_option("rien de grave") is not None
+    )
+    if value is None and is_mirror_consequence:
+        harmless = any(phrase in normalized for phrase in (
+            "rien de grave", "pas grave", "aucun probleme",
+            "aucune consequence", "peut attendre", "sans consequence",
+        ))
+        severe = any(word in normalized.split() for word in (
+            "meurs", "meurt", "mourir", "mort", "vital", "vitale",
+            "survie", "danger", "grave",
+        )) or any(phrase in normalized for phrase in (
+            "pour vivre", "risque de mourir", "besoin de manger",
+        ))
+        if harmless:
+            value, meaning = find_option("rien de grave"), "aucune conséquence grave"
+        elif severe:
+            value, meaning = find_option("vrai probleme"), "une conséquence grave ou vitale"
+
+    if value is None:
+        return None
+    reformulation = (
+        f"You clearly indicate {meaning}."
+        if language == "en" else f"Tu indiques clairement {meaning}."
+    )
+    return InterpretedQuestionAnswer(
+        value=value,
+        incertitude=0,
+        reformulation=reformulation,
+    )
+
+
 class LLMFacade:
     def __init__(self, client: ChatClient | None, log_fn: LogFn | None = None):
         self._client = client
@@ -113,7 +215,8 @@ class LLMFacade:
                 raw = self._client.chat(prompts.INTERVIEWER_SYSTEM, payload,
                                         max_tokens=160)
                 result = _validate(axis, _extract_json(raw))
-            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
+            except (LLMError, TypeError, ValueError, KeyError,
+                    json.JSONDecodeError) as e:
                 self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
                 self._log("nlu", model, int((time.monotonic() - t0) * 1000), False)
                 continue
@@ -133,6 +236,12 @@ class LLMFacade:
         if not self.available:
             self.last_error = "LLM désactivé (enabled = false ou section absente)"
             return None
+        deterministic = _deterministic_question_answer(
+            options, user_text, language)
+        if deterministic is not None:
+            self.last_error = None
+            self._log("question_nlu", self._client.cfg.model, 0, True)
+            return deterministic
         valid_values = {value for _, value in options}
         payload = prompts.build_question_interpret_payload(
             question, options, user_text, language)
@@ -405,10 +514,37 @@ class LLMFacade:
         current_axes: dict,
         language: str = "fr",
     ) -> dict | None:
-        """Interpret one challenge answer as a candidate axis update."""
+        """Interpret a challenge answer without blocking on safe abstention."""
         if not self.available:
             self.last_error = "LLM désactivé (enabled = false ou section absente)"
             return None
+        binary = _binary_answer(user_text)
+        if binary is not None:
+            if language == "en":
+                reason = (
+                    "Explicit yes: the question's hypothesis is confirmed, "
+                    "without evidence supporting a numeric axis correction."
+                    if binary else
+                    "Explicit no: the question's hypothesis is rejected, "
+                    "with no axis correction required."
+                )
+            else:
+                reason = (
+                    "Réponse affirmative explicite : l'hypothèse de la question "
+                    "est confirmée, sans élément permettant de chiffrer un axe."
+                    if binary else
+                    "Réponse négative explicite : l'hypothèse de la question est "
+                    "rejetée, sans correction d'axe nécessaire."
+                )
+            self.last_error = None
+            self._log("challenge_answer", self._client.cfg.model, 0, True)
+            return {
+                "axis": None,
+                "value": None,
+                "uncertainty": 0,
+                "reason": reason,
+                "outcome": "no_change",
+            }
         lang = "en" if language == "en" else "fr"
         payload = prompts.build_challenge_answer_payload(
             task_title, subjective, question, user_text, current_axes, lang)
@@ -421,14 +557,53 @@ class LLMFacade:
                 raw = self._client.chat(prompts.CHALLENGE_ANSWER_SYSTEM, payload,
                                         max_tokens=128)
                 data = _extract_json(raw)
-                _require_confidence(data)
+                status = str(data.get("status", "ok")).strip().lower()
+                if status not in ("ok", "premise_false", "abstain"):
+                    raise ValueError(f"status invalide : {status!r}")
+                confidence = data.get("confidence", 1.0)
+                if (not isinstance(confidence, (int, float))
+                        or isinstance(confidence, bool)
+                        or not 0 <= float(confidence) <= 1):
+                    raise ValueError(f"confidence invalide : {confidence!r}")
+                reason = str(data.get("reason", "")).strip()
+                uncertainty = int(data.get("uncertainty", 0) or 0)
+                if uncertainty not in (0, 1, 2):
+                    raise ValueError(f"incertitude invalide : {uncertainty}")
+                low_confidence = float(confidence) < 0.55
+                premise_false = (
+                    status == "premise_false" or _contests_premise(user_text)
+                )
+                if status == "abstain" or low_confidence:
+                    result = {
+                        "axis": None,
+                        "value": None,
+                        "uncertainty": max(uncertainty, 2),
+                        "reason": reason or (
+                            "La prémisse de la question est contestée, mais "
+                            "aucun fait ne permet de modifier un axe."
+                            if premise_false else
+                            "Réponse conservée, sans fait assez précis pour "
+                            "modifier un axe."
+                        ),
+                        "outcome": (
+                            "premise_false" if premise_false else "no_change"
+                        ),
+                    }
+                    self.last_error = None
+                    self._log("challenge_answer", model,
+                              int((time.monotonic() - t0) * 1000), True)
+                    return result
                 axis = data.get("axis")
                 if axis in ("", None, "null"):
                     result = {
                         "axis": None,
                         "value": None,
-                        "uncertainty": int(data.get("uncertainty", 0) or 0),
-                        "reason": str(data.get("reason", "")).strip(),
+                        "uncertainty": uncertainty,
+                        "reason": reason or "Aucune correction d'axe nécessaire.",
+                        "outcome": (
+                            "premise_false" if premise_false
+                            else "no_change"
+                        ),
                     }
                 else:
                     if axis not in valid_axes:
@@ -436,16 +611,18 @@ class LLMFacade:
                     value = int(data.get("value"))
                     if value < 0 or value > max_by_axis[axis]:
                         raise ValueError(f"valeur invalide pour {axis}: {value}")
-                    uncertainty = int(data.get("uncertainty", 0))
-                    if uncertainty not in (0, 1, 2):
-                        raise ValueError(f"incertitude invalide : {uncertainty}")
                     result = {
                         "axis": axis,
                         "value": value,
                         "uncertainty": uncertainty,
-                        "reason": str(data.get("reason", "")).strip(),
+                        "reason": reason or "Un fait justifie cette correction.",
+                        "outcome": (
+                            "premise_false" if premise_false
+                            else "correction"
+                        ),
                     }
-            except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
+            except (LLMError, TypeError, ValueError, KeyError,
+                    json.JSONDecodeError) as e:
                 self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
                 self._log("challenge_answer", model,
                           int((time.monotonic() - t0) * 1000), False)

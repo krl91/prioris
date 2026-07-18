@@ -242,7 +242,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `215 passed`.
+Expected result: `224 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +261,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `215 passed`.
+Expected result: `224 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -439,6 +439,44 @@ the evaluation is provisional, and all possible quadrants are reported. The
 `weight × (high-low) / maximum` on the crossed threshold. For example,
 hesitant `IMP=2` gives `[1,3]`, a 17.5-point importance swing. If `I` then spans
 42 to 59, Q4 and Q2 are possible and `IMP` should be clarified first.
+
+**Anti-bias questions and false premises.** The three LLM-generated questions
+are verification hypotheses, not established facts. They are asked one at a
+time after factual questions. Each answer produces exactly one outcome:
+
+1. `correction`: a fact supports at most one proposed axis and value; the GUI
+   or Telegram explains it and requires confirmation before changing scoring;
+2. `premise_false`: the answer rejects an assumption in the question; it is
+   retained in the audit trail. Without another scorable fact, no axis changes
+   and the interview advances;
+3. `no_change`: the LLM abstains or confidence is below `0.55`; the answer is
+   retained with high uncertainty, no number is invented, and the interview
+   advances.
+
+Deterministic special case: an answer consisting only of `yes`, `no`, or an
+unambiguous short variant (`not at all`, `absolutely`) is complete for a closed
+question. PRIORIS recognizes it before calling the LLM, records it with zero
+uncertainty, and continues with `no_change`, because confirming or rejecting a
+hypothesis alone does not provide a numeric axis value. For “Is social pressure
+influencing P1?”, `no` rejects the proposed bias; it is neither a failure nor a
+reason to change `CDR`, `IMP`, or another axis.
+
+The final mirror question uses the same conservative safeguard when its three
+options represent a real problem, nothing serious, and unknown. An explicitly
+fatal, vital, or severe consequence selects the strongest option with zero
+uncertainty. For example, “I would die because I need to eat to live” supports
+the real-problem option; “Nothing serious would happen” supports the harmless
+option. Without a strong marker, the fallback selects nothing and lets the LLM
+or buttons handle the answer. The interpretation is still displayed and
+requires confirmation before any mirror correction is applied.
+
+For example, “Why is this task urgent although it requires no immediate
+action?” contains an assumption. “That is false: I must act now” produces at
+least `premise_false`. Adding “before noon or I lose the slot” may also justify
+a proposed `CDR` correction, which still requires user confirmation. Rejecting
+the premise alone never selects an arbitrary value. Answers therefore affect
+the system either as confirmed facts in the axes or as audit evidence; only
+confirmed values enter `U`, `I`, and `G`.
 
 **Parameters that do not directly enter the score.**
 
@@ -669,7 +707,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 215 passing automated tests.
+- 224 passing automated tests.
 
 Still possible future work:
 

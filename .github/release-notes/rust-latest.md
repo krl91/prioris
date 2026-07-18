@@ -1,20 +1,15 @@
 ## PRIORIS Rust __VERSION__
 
-## Nouveautés depuis Rust 0.1.1
+## Correctifs depuis Rust 0.2.1
 
-- Algorithme v2 commun avec Python : `IMP` explicite en mode express,
-  intervalles de robustesse, quadrants possibles et axe pivot.
-- Garde-fou sur l'alignement objectif, seuil pépite aligné à 50 et libellés de
-  blocage clarifiés.
-- Génération GGUF embarquée contrainte par schéma JSON avec `mistral.rs`, sans
-  serveur et sans port local.
-- Budgets de tokens par opération, température nulle, abstention explicite et
-  seuil de confiance.
-- Le budget axe/choix passe à 160 tokens et la reformulation est bornée afin
-  que le JSON contraint soit toujours terminé lors du test GGUF réel.
-- `/info` transmet au LLM une présélection déterministe de cinq tâches maximum
-  et rejette les identifiants extérieurs.
-- Affichage de la robustesse dans la GUI et Telegram ; tests et `clippy` propres.
+- Les questions anti-biais ne bloquent plus l'entretien lorsqu'une réponse
+  conteste leur prémisse ou lorsque le LLM s'abstient. Aucun axe n'est inventé.
+- Les réponses courtes `oui`, `non`, `pas du tout` et `tout à fait` sont
+  interprétées de manière déterministe avant l'inférence.
+- La question miroir reconnaît les conséquences explicitement graves ou
+  vitales et reste conservatrice pour les formulations ambiguës.
+- Les mêmes règles sont couvertes par les tests Rust et par le test GGUF réel
+  exécuté sur les archives macOS, Windows et Linux avant leur publication.
 
 ## Télécharger
 

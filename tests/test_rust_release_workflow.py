@@ -1,8 +1,14 @@
 from pathlib import Path
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "rust-standalone.yml"
+
+pytestmark = pytest.mark.skipif(
+    not WORKFLOW.exists(),
+    reason="Rust workflow file not present (bundle install – source checkout required)",
+)
 
 
 def test_rust_macos_release_requires_real_apple_signing() -> None:

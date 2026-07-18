@@ -97,6 +97,7 @@ fn run_application(
     anyhow::bail!("this binary was built without GUI and Telegram support")
 }
 
+#[cfg(target_os = "macos")]
 fn macos_bundle_distribution_dir(executable: &Path) -> Option<PathBuf> {
     let macos = executable.parent()?;
     if macos.file_name()? != "MacOS" {
@@ -273,6 +274,7 @@ mod tests {
         assert!(!parsed.config_explicit);
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn finds_distribution_directory_around_macos_app() {
         let executable = Path::new(

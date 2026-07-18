@@ -126,6 +126,39 @@ To start without an LLM, replace only:
 enabled = false
 ```
 
+### 1.2 Install the standalone Rust release
+
+The Rust port is a prerelease distributed separately from Python. Starting
+with Rust 0.2.3, the macOS archive contains a real `PRIORIS.app` bundle:
+
+1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.3`
+   or a newer Rust release;
+2. download `prioris-rust-v0.2.3-macos-arm64.zip` and extract it;
+3. keep `PRIORIS.app`, `config.toml`, `models/` and `ObsidianVault/` together;
+4. double-click `PRIORIS.app`.
+
+The app uses Hardened Runtime, is signed with a **Developer ID Application**
+certificate, submitted to Apple with `notarytool`, stapled and validated, then
+assessed with `spctl`. `scripts/run.sh` launches the same signed Mach-O from a
+terminal. Windows and Linux continue to use `scripts/run.ps1` and
+`scripts/run.sh` respectively.
+
+Maintainers must configure these GitHub Actions secrets before creating a
+`rust-v*` tag: `APPLE_CERTIFICATE_P12_BASE64`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
+`APPLE_TEAM_ID` and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is the
+single-line Base64 encoding of a password-protected `.p12` containing the
+Developer ID Application certificate and its private key. The signing identity
+must be its full name, such as
+`Developer ID Application: Example Name (TEAMID)`.
+
+The workflow checks these values before the macOS build, imports the certificate
+into an ephemeral keychain, signs the binary and app, waits for Apple
+notarization, staples the ticket and runs Gatekeeper assessment. A failed or
+missing step prevents publication. See Apple's official documentation for
+[Developer ID](https://developer.apple.com/developer-id/) and
+[macOS notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+
 ## 2. What PRIORIS Does
 
 PRIORIS is a local-first decision-support assistant. It helps you capture tasks,
@@ -242,7 +275,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `225 passed`.
+Expected result: `228 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +294,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `225 passed`.
+Expected result: `228 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -714,7 +747,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 225 passing automated tests.
+- 228 passing automated tests.
 
 Still possible future work:
 

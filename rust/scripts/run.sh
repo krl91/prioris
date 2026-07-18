@@ -1,8 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-if [ "$(uname -s)" = "Darwin" ] && command -v xattr >/dev/null 2>&1; then
-  # GitHub archives are not notarized; clear their download quarantine before launch.
-  xattr -dr com.apple.quarantine . 2>/dev/null || true
+if [ "$(uname -s)" = "Darwin" ] && [ -x "PRIORIS.app/Contents/MacOS/prioris" ]; then
+  exec ./PRIORIS.app/Contents/MacOS/prioris --config config.toml "$@"
 fi
 exec ./prioris --config config.toml "$@"

@@ -11,16 +11,19 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.2.2 |
+| Système | Archive Rust 0.2.3 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.2.2-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.2.2-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.2.2-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.2.3-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.2.3-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.2.3-linux-x64.tar.gz` |
 
-Décompresse l'archive puis lance `scripts/run.sh` sous macOS/Linux ou
-`scripts/run.ps1` sous Windows. Le modèle Ministral 3B, `config.toml` et
-`ObsidianVault` sont déjà inclus. `SHA256SUMS.txt`, joint à la release, permet
-de vérifier l'intégrité de l'archive.
+Décompresse l'archive. Sous macOS, conserve `PRIORIS.app`, `config.toml`,
+`models/` et `ObsidianVault/` dans le même dossier, puis double-clique sur
+`PRIORIS.app`. L'application est signée Developer ID, notarée par Apple et son
+ticket est agrafé au bundle. Le lancement en terminal reste disponible avec
+`scripts/run.sh`. Sous Linux, utilise `scripts/run.sh`; sous Windows,
+`scripts/run.ps1`. `SHA256SUMS.txt`, joint à la release, permet de vérifier
+l'intégrité des archives.
 
 ## État fonctionnel
 
@@ -116,9 +119,29 @@ sauvegarde ; Telegram et le chemin SQLite nécessitent un redémarrage. Sous
 Unix, le fichier sauvegardé reçoit les permissions `0600`.
 
 Dans une archive distribuée, `scripts/run.sh` lance directement l'application.
-Sur macOS, ce script retire aussi l'attribut de quarantaine de l'archive avant
-de lancer le binaire signé ad hoc. Une distribution sans cet assouplissement
-nécessiterait un certificat Apple Developer ID et une notarisation Apple.
+Sur macOS, il exécute le même Mach-O que `PRIORIS.app`. Le workflow refuse de
+publier un tag Rust si la signature Developer ID, la notarisation, l'agrafage
+du ticket ou l'évaluation Gatekeeper échoue. Aucun retrait de quarantaine ne
+sert à contourner Gatekeeper.
+
+## Signature et notarisation macOS pour les mainteneurs
+
+Le dépôt GitHub doit contenir ces secrets Actions avant de pousser un tag
+`rust-v*` :
+
+| Secret | Contenu |
+|---|---|
+| `APPLE_CERTIFICATE_P12_BASE64` | certificat **Developer ID Application** et sa clé privée, exportés en `.p12`, puis encodés en Base64 sur une seule ligne |
+| `APPLE_CERTIFICATE_PASSWORD` | mot de passe choisi lors de l'export du `.p12` |
+| `APPLE_SIGNING_IDENTITY` | identité complète, par exemple `Developer ID Application: Example Name (TEAMID)` |
+| `APPLE_ID` | identifiant du compte Apple autorisé à notariser |
+| `APPLE_TEAM_ID` | identifiant d'équipe Apple Developer à 10 caractères |
+| `APPLE_APP_SPECIFIC_PASSWORD` | mot de passe d'application créé pour `notarytool` |
+
+Apple exige un compte Developer Program et un certificat Developer ID pour une
+distribution directe reconnue par Gatekeeper. Voir la documentation Apple sur
+[Developer ID](https://developer.apple.com/developer-id/) et la
+[notarisation macOS](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
 Sous Windows PowerShell :
 
@@ -176,13 +199,14 @@ d'abord et sans planifier les P4 ni les estimations inconnues. Les questions,
 ## Vérifications intégrées
 
 ```bash
-./prioris --self-test
-./prioris --llm-smoke models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+./scripts/self-test.sh
+# Windows : .\scripts\self-test.ps1
 ```
 
-Le premier test vérifie le binaire, SQLite et le scoring. Le second charge
-réellement le GGUF, vérifie le schéma JSON de santé, puis interprète une réponse
-`IMP` structurée avec validation de l'échelle et de la confiance.
+Ce test vérifie le binaire, SQLite et le scoring. Le workflow de release lance
+en plus `--llm-smoke` avant le packaging : il charge réellement le GGUF,
+vérifie le schéma JSON de santé, puis interprète des réponses structurées avec
+validation de l'échelle et de la confiance.
 
 ## Note sur « 100 % Rust »
 

@@ -1,15 +1,18 @@
 ## PRIORIS Rust __VERSION__
 
-## Correctifs depuis Rust 0.2.1
+## Correctifs depuis Rust 0.2.2
 
-- Les questions anti-biais ne bloquent plus l'entretien lorsqu'une réponse
-  conteste leur prémisse ou lorsque le LLM s'abstient. Aucun axe n'est inventé.
-- Les réponses courtes `oui`, `non`, `pas du tout` et `tout à fait` sont
-  interprétées de manière déterministe avant l'inférence.
-- La question miroir reconnaît les conséquences explicitement graves ou
-  vitales et reste conservatrice pour les formulations ambiguës.
-- Les mêmes règles sont couvertes par les tests Rust et par le test GGUF réel
-  exécuté sur les archives macOS, Windows et Linux avant leur publication.
+- L'archive macOS contient maintenant `PRIORIS.app`, lançable par double-clic,
+  au lieu d'exposer un binaire nu à Finder.
+- Le bundle et son Mach-O sont signés avec un certificat Developer ID
+  Application, Hardened Runtime et horodatage Apple ; la signature ad hoc a été
+  supprimée.
+- Le workflow soumet l'application à `notarytool`, agrafe et valide le ticket,
+  puis exige une évaluation Gatekeeper `spctl` réussie avant publication.
+- L'application ouverte depuis Finder retrouve automatiquement `config.toml`,
+  le modèle GGUF et `ObsidianVault` dans le dossier extrait.
+- Une release Rust est désormais refusée si les identifiants Apple manquent ou
+  si la signature, la notarisation ou un contrôle de lancement échoue.
 
 ## Télécharger
 
@@ -18,8 +21,9 @@
 - Linux x64 : `prioris-__TAG__-linux-x64.tar.gz`
 - Vérification : `SHA256SUMS.txt`
 
-Chaque archive contient le binaire natif, `config.toml`, les scripts de
-lancement, `ObsidianVault` et le modèle Ministral 3B GGUF.
+Chaque archive contient l'application native, `config.toml`, les scripts de
+lancement, `ObsidianVault` et le modèle Ministral 3B GGUF. Sur macOS, conserve
+ces éléments dans le même dossier et ouvre `PRIORIS.app`.
 
 Cette version Rust reste publiée en préversion et séparée des releases Python.
 Consultez le [README Rust](https://github.com/__REPOSITORY__/blob/__TAG__/rust/README.md),

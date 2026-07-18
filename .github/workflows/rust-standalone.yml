@@ -96,6 +96,29 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
+      - name: Require Apple release credentials
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          for name in \
+            APPLE_CERTIFICATE_P12_BASE64 \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_TEAM_ID \
+            APPLE_APP_SPECIFIC_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub secret: $name" >&2
+              exit 1
+            fi
+          done
       - name: Build optimized native binary
         working-directory: rust
         run: cargo build --locked --release --features "${{ matrix.features }}"
@@ -143,14 +166,93 @@ jobs:
           $actual = (Get-FileHash "bundle/$env:BUNDLE_NAME/models/$env:MODEL_FILE" -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $env:MODEL_SHA256) { throw "Model SHA256 mismatch: $actual" }
 
-      - name: Sign macOS executable
+      - name: Create macOS application bundle
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
         run: |
-          codesign --force --sign - --options runtime --timestamp=none "bundle/$BUNDLE_NAME/${{ matrix.binary }}"
-          codesign --verify --strict --verbose=2 "bundle/$BUNDLE_NAME/${{ matrix.binary }}"
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          mkdir -p "$app/Contents/MacOS"
+          mv "bundle/$BUNDLE_NAME/${{ matrix.binary }}" "$app/Contents/MacOS/prioris"
+          version="${GITHUB_REF_NAME#rust-v}"
+          cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDevelopmentRegion</key><string>fr</string>
+            <key>CFBundleDisplayName</key><string>PRIORIS</string>
+            <key>CFBundleExecutable</key><string>prioris</string>
+            <key>CFBundleIdentifier</key><string>io.github.krl91.prioris</string>
+            <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+            <key>CFBundleName</key><string>PRIORIS</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>$version</string>
+            <key>CFBundleVersion</key><string>$GITHUB_RUN_NUMBER</string>
+            <key>LSMinimumSystemVersion</key><string>13.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$app/Contents/Info.plist"
+          test -x "$app/Contents/MacOS/prioris"
+      - name: Import Apple Developer ID certificate
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          certificate="$RUNNER_TEMP/apple-developer-id.p12"
+          keychain="$RUNNER_TEMP/prioris-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_IDENTITY"
+          echo "APPLE_KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
+      - name: Sign macOS application with Developer ID
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" \
+            --options runtime --timestamp "$app/Contents/MacOS/prioris"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" \
+            --options runtime --timestamp "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Authority=Developer ID Application:"
+      - name: Notarize and staple macOS application
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          submission="$RUNNER_TEMP/PRIORIS-notarization.zip"
+          ditto -c -k --keepParent "$app" "$submission"
+          xcrun notarytool submit "$submission" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=4 "$app"
       - name: Verify bundled LLM (Unix)
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os != 'Windows'
-        run: cd "bundle/$BUNDLE_NAME" && ./${{ matrix.binary }} --llm-smoke "models/$MODEL_FILE"
+        run: |
+          cd "bundle/$BUNDLE_NAME"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            executable="PRIORIS.app/Contents/MacOS/prioris"
+          else
+            executable="./${{ matrix.binary }}"
+          fi
+          "$executable" --llm-smoke "models/$MODEL_FILE"
       - name: Verify bundled LLM (Windows)
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'Windows'
         shell: pwsh
@@ -175,6 +277,13 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 3
+      - name: Remove temporary Apple signing keychain
+        if: always() && startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        run: |
+          if [ -n "${APPLE_KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$APPLE_KEYCHAIN_PATH" || true
+          fi
+          rm -f "$RUNNER_TEMP/apple-developer-id.p12" "$RUNNER_TEMP/PRIORIS-notarization.zip"
 
   release:
     name: Publish separate Rust release

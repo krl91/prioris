@@ -82,7 +82,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             225 tests automatisés
+tests/             228 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -90,7 +90,10 @@ produit un binaire Windows, Linux ou macOS sans Python et peut charger le GGUF
 Ministral directement dans le processus, sans serveur ni port. Consulte son
 README pour l'état exact de la parité fonctionnelle et les limites actuelles.
 Ses releases utilisent des tags `rust-v*` et restent séparées des releases
-Python `v0.x`.
+Python `v0.x`. À partir de Rust 0.2.3, l'archive macOS contient une application
+`PRIORIS.app` signée Developer ID, notarée par Apple et lançable par
+double-clic ; le workflow refuse la publication si un contrôle Gatekeeper
+échoue.
 
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
 store, ni bot, ni vault, ni SQLite, ni Telegram, ni client réseau.
@@ -161,7 +164,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `225 passed`.
+Résultat attendu dans un clone complet du dépôt source : `228 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -326,7 +329,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-225 tests passent localement. Les améliorations restantes envisagées sont :
+228 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

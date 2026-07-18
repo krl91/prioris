@@ -129,7 +129,76 @@ Pour démarrer sans LLM, remplace seulement :
 enabled = false
 ```
 
-### 1.2 Prérequis
+### 1.2 Installer la release Rust autonome
+
+La version Rust est une préversion séparée de la release Python. Depuis Rust
+0.2.3, l'archive macOS fournit un vrai bundle `PRIORIS.app` :
+
+1. ouvre <https://github.com/krl91/prioris/releases> et sélectionne la release
+   `rust-v0.2.3` ou une version Rust plus récente ;
+2. télécharge `prioris-rust-v0.2.3-macos-arm64.zip` ;
+3. décompresse l'archive sans déplacer séparément son contenu ;
+4. vérifie que `PRIORIS.app`, `config.toml`, `models/` et `ObsidianVault/` sont
+   côte à côte ;
+5. double-clique sur `PRIORIS.app`.
+
+Le bundle est signé avec un certificat **Developer ID Application**, utilise le
+Hardened Runtime, est envoyé au service de notarisation Apple avec `notarytool`,
+reçoit un ticket agrafé avec `stapler`, puis est évalué avec `spctl`. Il ne doit
+donc pas demander de retirer la quarantaine. Le script `scripts/run.sh` reste
+disponible pour un lancement en terminal et exécute le même Mach-O signé.
+
+Pour Windows et Linux, télécharge respectivement
+`prioris-rust-v0.2.3-windows-x64.zip` ou
+`prioris-rust-v0.2.3-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
+`scripts/run.sh`.
+
+#### Configurer la signature Apple du workflow
+
+Cette partie concerne uniquement le mainteneur qui publie une release. Apple
+demande une adhésion active au Developer Program pour créer un certificat de
+distribution Developer ID. Les références officielles sont
+[Signing Mac Software with Developer ID](https://developer.apple.com/developer-id/)
+et
+[Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+
+1. crée un certificat **Developer ID Application** dans le compte Apple
+   Developer ;
+2. installe-le dans le Trousseau macOS avec sa clé privée ;
+3. exporte le certificat et la clé privée dans `developer-id.p12`, protégé par
+   un mot de passe ;
+4. crée un mot de passe d'application pour l'identifiant Apple utilisé par
+   `notarytool` ;
+5. ajoute les six secrets GitHub suivants dans *Settings > Secrets and
+   variables > Actions* :
+
+| Secret GitHub | Valeur attendue |
+|---|---|
+| `APPLE_CERTIFICATE_P12_BASE64` | contenu Base64 monoligne du `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | mot de passe d'export du `.p12` |
+| `APPLE_SIGNING_IDENTITY` | identité complète, par exemple `Developer ID Application: Example Name (TEAMID)` |
+| `APPLE_ID` | identifiant Apple autorisé à notariser |
+| `APPLE_TEAM_ID` | identifiant d'équipe Apple Developer à 10 caractères |
+| `APPLE_APP_SPECIFIC_PASSWORD` | mot de passe d'application Apple |
+
+Exemples avec GitHub CLI, sans écrire les secrets dans le dépôt :
+
+```bash
+base64 < developer-id.p12 | tr -d '\n' | gh secret set APPLE_CERTIFICATE_P12_BASE64
+printf '%s' 'mot-de-passe-p12' | gh secret set APPLE_CERTIFICATE_PASSWORD
+printf '%s' 'Developer ID Application: Example Name (TEAMID)' | gh secret set APPLE_SIGNING_IDENTITY
+printf '%s' 'compte@example.com' | gh secret set APPLE_ID
+printf '%s' 'TEAMID' | gh secret set APPLE_TEAM_ID
+printf '%s' 'xxxx-xxxx-xxxx-xxxx' | gh secret set APPLE_APP_SPECIFIC_PASSWORD
+```
+
+Le workflow vérifie les secrets avant la compilation macOS. Il importe le
+`.p12` dans un trousseau éphémère, signe le binaire puis `PRIORIS.app`, attend
+le résultat de notarisation, agrafe et valide le ticket, et lance enfin
+`spctl --assess`. Si l'une de ces opérations échoue, aucun job de publication
+Rust ne peut démarrer. Le trousseau temporaire est supprimé même après échec.
+
+### 1.3 Prérequis
 
 | Besoin | Détail |
 |---|---|
@@ -149,7 +218,7 @@ options avancées.
 | **Telegram** | `token = "123456:..."` | Mobile, notifications push, disponible de partout | Compte Telegram + bot à créer |
 | **Local (GUI)** | `token = ""` ou absent | Zéro compte requis, aucune dépendance externe | Même machine uniquement, pas de mobile |
 
-### 1.3 Mode local — interface graphique (sans Telegram)
+### 1.4 Mode local — interface graphique (sans Telegram)
 
 Si tu préfères ne pas utiliser Telegram, laisse le champ `token` vide (ou
 absent) dans `config.toml`. PRIORIS démarre alors une fenêtre graphique locale
@@ -217,7 +286,7 @@ La configuration `"fr"` ou l'absence de section `[ui]` conserve le français.
 Le scoring ne change pas : seule la formulation des questions/options est
 traduite.
 
-### 1.4 Créer le bot Telegram (5 min) — mode Telegram uniquement
+### 1.5 Créer le bot Telegram (5 min) — mode Telegram uniquement
 
 1. Dans Telegram, ouvrir une conversation avec **@BotFather**.
 2. Envoyer `/newbot`.
@@ -240,7 +309,7 @@ llm - Diagnostic du LLM
 
 Le bot est personnel : ne partage pas le token (quiconque l'a contrôle le bot).
 
-### 1.5 Installation développeur ou manuelle
+### 1.6 Installation développeur ou manuelle
 
 PRIORIS doit pouvoir être installé **offline** : l'application ne télécharge
 ni dépendances, ni modèle LLM au démarrage. En environnement sans réseau, il
@@ -372,7 +441,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `225 passed`.
+Résultat attendu : `228 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,10 +460,10 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `225 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `228 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
-### 1.6 Rappels pour Obsidian et Windows
+### 1.7 Rappels pour Obsidian et Windows
 
 Dans `config.toml`, la base SQLite est créée automatiquement au premier
 lancement :
@@ -430,7 +499,7 @@ vault_path = 'C:\Users\Example\Documents\Vault'
 L'export écrit uniquement `PRIORIS/Plan du jour.md` dans le vault — jamais
 ailleurs. Le dossier `PRIORIS/` est créé s'il n'existe pas.
 
-### 1.7 Premier lancement
+### 1.8 Premier lancement
 
 ```bash
 python -m prioris.bot.main
@@ -440,7 +509,7 @@ Si `[telegram] token = ""`, la fenêtre GUI locale s'ouvre. Si un token Telegram
 est renseigné, ouvre ton bot dans Telegram et envoie `/add Tester PRIORIS`. Si
 la question de catégorie apparaît, tout fonctionne.
 
-### 1.8 Lancement automatique (recommandé)
+### 1.9 Lancement automatique (recommandé)
 
 Le bot doit tourner en permanence pour l'usage quotidien.
 
@@ -488,7 +557,7 @@ journalctl -u prioris -f          # logs
 launchctl load ~/Library/LaunchAgents/net.prioris.bot.plist
 ```
 
-### 1.9 Conversation et LLM — 4 modes possibles
+### 1.10 Conversation et LLM — 4 modes possibles
 
 La couche conversation permet de **répondre en texte libre** pendant
 l'entretien : PRIORIS propose une interprétation, que tu confirmes d'un bouton.
@@ -853,7 +922,7 @@ tentatives. Les endpoints compatibles utilisent `response_format` lorsqu'ils
 le supportent. Aucun de ces mécanismes ne donne au LLM le droit de calculer ou
 d'écrire une priorité.
 
-### 1.10 Sauvegarde
+### 1.11 Sauvegarde
 
 Tout l'état vit dans **un seul fichier** : `prioris.db`. Une copie datée
 suffit (cron quotidien recommandé) :
@@ -1485,7 +1554,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 225 tests automatisés passent localement dans le dépôt source
+**État tests** : 228 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

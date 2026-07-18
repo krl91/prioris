@@ -78,14 +78,17 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             205 automated tests
+tests/             228 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
 vault, SQLite, Telegram nor any network client.
 
 The experimental native port lives in [`rust/`](rust/README.md). Its releases
-use `rust-v*` tags and remain separate from the Python `v0.x` releases.
+use `rust-v*` tags and remain separate from the Python `v0.x` releases. Starting
+with Rust 0.2.3, the macOS archive contains a Developer ID-signed and
+Apple-notarized `PRIORIS.app` that launches by double-clicking; the workflow
+refuses to publish when a Gatekeeper check fails.
 
 ## Install from the Release
 
@@ -152,7 +155,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `225 passed`.
+Expected result in a full source repository clone: `228 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -313,7 +316,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-225 tests pass locally. Remaining possible improvements: advanced scenario
+228 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

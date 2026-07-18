@@ -1,4 +1,7 @@
-use std::{ffi::OsString, path::PathBuf};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 use prioris::config::Config;
 
@@ -15,6 +18,7 @@ enum Action {
 struct Cli {
     action: Action,
     config_path: PathBuf,
+    config_explicit: bool,
     no_gui: bool,
 }
 
@@ -35,11 +39,16 @@ fn main() -> anyhow::Result<()> {
             print_help();
             Ok(())
         }
-        Action::Run => run_application(cli.config_path, cli.no_gui),
+        Action::Run => run_application(cli.config_path, cli.config_explicit, cli.no_gui),
     }
 }
 
-fn run_application(config_path: PathBuf, no_gui: bool) -> anyhow::Result<()> {
+fn run_application(
+    config_path: PathBuf,
+    config_explicit: bool,
+    no_gui: bool,
+) -> anyhow::Result<()> {
+    prepare_macos_bundle_working_directory(config_explicit)?;
     let config = Config::load(&config_path)?;
     #[cfg(any(feature = "gui", feature = "telegram"))]
     let llm = prioris::llm::LlmService::new(config.llm.clone());
@@ -86,6 +95,38 @@ fn run_application(config_path: PathBuf, no_gui: bool) -> anyhow::Result<()> {
 
     #[cfg(all(not(feature = "gui"), not(feature = "telegram")))]
     anyhow::bail!("this binary was built without GUI and Telegram support")
+}
+
+fn macos_bundle_distribution_dir(executable: &Path) -> Option<PathBuf> {
+    let macos = executable.parent()?;
+    if macos.file_name()? != "MacOS" {
+        return None;
+    }
+    let contents = macos.parent()?;
+    if contents.file_name()? != "Contents" {
+        return None;
+    }
+    let application = contents.parent()?;
+    if application.extension()? != "app" {
+        return None;
+    }
+    application.parent().map(Path::to_path_buf)
+}
+
+#[cfg(target_os = "macos")]
+fn prepare_macos_bundle_working_directory(config_explicit: bool) -> anyhow::Result<()> {
+    if config_explicit {
+        return Ok(());
+    }
+    if let Some(directory) = macos_bundle_distribution_dir(&std::env::current_exe()?) {
+        std::env::set_current_dir(directory)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn prepare_macos_bundle_working_directory(_config_explicit: bool) -> anyhow::Result<()> {
+    Ok(())
 }
 
 fn llm_smoke(model: PathBuf) -> anyhow::Result<()> {
@@ -156,6 +197,7 @@ fn parse_arguments(arguments: impl IntoIterator<Item = OsString>) -> anyhow::Res
     let mut cli = Cli {
         action: Action::Run,
         config_path: "config.toml".into(),
+        config_explicit: false,
         no_gui: false,
     };
     let mut positional_config = false;
@@ -168,6 +210,7 @@ fn parse_arguments(arguments: impl IntoIterator<Item = OsString>) -> anyhow::Res
                     .map(PathBuf::from)
                     .ok_or_else(|| anyhow::anyhow!("--config requires a path"))?;
                 positional_config = true;
+                cli.config_explicit = true;
             }
             "--no-gui" | "--headless" => cli.no_gui = true,
             "--self-test" => cli.action = Action::SelfTest,
@@ -184,6 +227,7 @@ fn parse_arguments(arguments: impl IntoIterator<Item = OsString>) -> anyhow::Res
             _ if !positional_config && cli.action == Action::Run => {
                 cli.config_path = PathBuf::from(argument);
                 positional_config = true;
+                cli.config_explicit = true;
             }
             value => anyhow::bail!("unexpected argument: {value}"),
         }
@@ -211,6 +255,7 @@ mod tests {
         .unwrap();
         assert!(parsed.no_gui);
         assert_eq!(parsed.config_path, PathBuf::from("settings.toml"));
+        assert!(parsed.config_explicit);
     }
 
     #[test]
@@ -218,5 +263,30 @@ mod tests {
         let parsed = parse_arguments([OsString::from("custom.toml")]).unwrap();
         assert_eq!(parsed.config_path, PathBuf::from("custom.toml"));
         assert_eq!(parsed.action, Action::Run);
+        assert!(parsed.config_explicit);
+    }
+
+    #[test]
+    fn default_config_is_not_explicit() {
+        let parsed = parse_arguments([]).unwrap();
+        assert_eq!(parsed.config_path, PathBuf::from("config.toml"));
+        assert!(!parsed.config_explicit);
+    }
+
+    #[test]
+    fn finds_distribution_directory_around_macos_app() {
+        let executable = Path::new(
+            "/Applications/prioris-rust-v0.2.3-macos-arm64/PRIORIS.app/Contents/MacOS/prioris",
+        );
+        assert_eq!(
+            macos_bundle_distribution_dir(executable),
+            Some(PathBuf::from(
+                "/Applications/prioris-rust-v0.2.3-macos-arm64"
+            ))
+        );
+        assert_eq!(
+            macos_bundle_distribution_dir(Path::new("/tmp/prioris")),
+            None
+        );
     }
 }

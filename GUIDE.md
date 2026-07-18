@@ -624,7 +624,7 @@ Artefacts vérifiés :
 
 | Artefact | Chemin | SHA256 |
 |---|---|---|
-| Ministral 3 3B Q4_K_M | `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` | `9ed150d4367e68df0ac8e1540f6ddc65b42d0ee26378329d1ecbca60f93fc5f8` |
+| Ministral 3 3B Q4_K_M | `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` | `fd46fc371ff0509bfa8657ac956b7de8534d7d9baaa4947975c0648c3aa397f4` |
 | Ministral 3 8B Q4_K_M | `models/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf` | `33e7a72cf5e6e2cfc2f2847075acc013d68bba023e35310cef86b5cf8fdca761` |
 | Runtime pur macOS arm64 CPU-only | `runtime/macos-arm64/llama-simple` | `d77108bcc15f8c108d69cf8e948cad1076d39b4d4a63468b95971c33c38cd3cf` |
 | Runtime pur Windows x64 CPU-only | `runtime/windows-x64/llama-simple.exe` | `03f14ad4fbf1fcfff31e39816c4226694a140eb2eb231c90f8ac33463cdcb123` |

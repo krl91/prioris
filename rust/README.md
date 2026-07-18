@@ -11,11 +11,11 @@ Les releases Rust sont séparées des releases Python et utilisent des tags
 `rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
 puis télécharge uniquement l'archive correspondant à ton système :
 
-| Système | Archive Rust 0.1.0 |
+| Système | Archive Rust 0.1.1 |
 |---|---|
-| macOS Apple Silicon | `prioris-rust-v0.1.0-macos-arm64.zip` |
-| Windows x64 | `prioris-rust-v0.1.0-windows-x64.zip` |
-| Linux x64 | `prioris-rust-v0.1.0-linux-x64.tar.gz` |
+| macOS Apple Silicon | `prioris-rust-v0.1.1-macos-arm64.zip` |
+| Windows x64 | `prioris-rust-v0.1.1-windows-x64.zip` |
+| Linux x64 | `prioris-rust-v0.1.1-linux-x64.tar.gz` |
 
 Décompresse l'archive puis lance `scripts/run.sh` sous macOS/Linux ou
 `scripts/run.ps1` sous Windows. Le modèle Ministral 3B, `config.toml` et

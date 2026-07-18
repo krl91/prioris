@@ -193,7 +193,7 @@ dépendances : pas de `llama-server`, pas de `ggml-rpc-server`, pas de
 Téléchargement manuel des modèles GGUF recommandés :
 
 - 3B Q4_K_M, recommandé par défaut :
-  https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/7564922f37fa5bbb62b87f09a55c12f1f91d7a6a/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
 - 8B Q4_K_M, plus lourd :
   https://huggingface.co/unsloth/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf
 

@@ -4,10 +4,13 @@
 
 - Corrige l'analyse Clippy Linux en conditionnant l'import macOS de `Path`.
 - Empêche le workflow Python de traiter les tags et releases `rust-v*`.
-- Exige les six secrets Apple avant toute construction de release macOS Rust.
-- Supprime la signature ad hoc et le script de retrait de quarantaine des
-  archives officielles ; la signature Developer ID, la notarisation, l'agrafage
-  du ticket et l'évaluation Gatekeeper doivent tous réussir.
+- Permet une release macOS gratuite avec signature ad hoc lorsque les secrets
+  Apple sont absents ; l'utilisateur autorise une fois `PRIORIS.app` dans les
+  réglages de sécurité macOS.
+- Inclut `OUVRIR-MACOS.md` avec la procédure bilingue et ne retire jamais la
+  quarantaine automatiquement dans la distribution Rust.
+- Conserve le chemin Developer ID et notarisation lorsque les six secrets Apple
+  sont configurés, et refuse une configuration partielle.
 - Remplace la release `rust-v0.2.3`, invalide car elle contenait des artefacts
   Python après le déclenchement incorrect du workflow principal.
 

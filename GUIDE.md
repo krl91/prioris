@@ -142,22 +142,40 @@ La version Rust est une préversion séparée de la release Python. Depuis Rust
    côte à côte ;
 5. double-clique sur `PRIORIS.app`.
 
-Le bundle est signé avec un certificat **Developer ID Application**, utilise le
-Hardened Runtime, est envoyé au service de notarisation Apple avec `notarytool`,
-reçoit un ticket agrafé avec `stapler`, puis est évalué avec `spctl`. Il ne doit
-donc pas demander de retirer la quarantaine. Le script `scripts/run.sh` reste
-disponible pour un lancement en terminal et exécute le même Mach-O signé.
+Sans secrets Apple, le bundle utilise une signature ad hoc gratuite avec
+Hardened Runtime. Le premier double-clic peut afficher qu'Apple ne peut pas
+vérifier l'application. Dans ce cas :
+
+1. ferme l'alerte avec **Terminé** ;
+2. ouvre **Réglages Système > Confidentialité et sécurité** ;
+3. descends jusqu'à la section **Sécurité** ;
+4. clique sur **Ouvrir quand même** à côté du message concernant PRIORIS ;
+5. authentifie-toi si nécessaire, puis confirme avec **Ouvrir**.
+
+Cette autorisation n'est demandée qu'au premier lancement. La même procédure
+est incluse dans `OUVRIR-MACOS.md` à la racine de l'archive. Aucun script ne
+retire automatiquement la quarantaine : l'utilisateur conserve le contrôle de
+l'autorisation macOS. Vérifie auparavant que l'archive vient de la release
+officielle et que son empreinte correspond à `SHA256SUMS.txt`.
+
+Lorsque les six secrets Apple sont disponibles, le workflow remplace ce chemin
+gratuit par une signature **Developer ID Application**, une notarisation avec
+`notarytool`, l'agrafage du ticket avec `stapler` et une évaluation `spctl`. Dans
+ce cas, **Ouvrir quand même** ne devrait pas être nécessaire. Le script
+`scripts/run.sh` reste disponible et exécute le même Mach-O que `PRIORIS.app`.
 
 Pour Windows et Linux, télécharge respectivement
 `prioris-rust-v0.2.4-windows-x64.zip` ou
 `prioris-rust-v0.2.4-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
 `scripts/run.sh`.
 
-#### Configurer la signature Apple du workflow
+#### Configurer la signature Apple du workflow (optionnel)
 
-Cette partie concerne uniquement le mainteneur qui publie une release. Apple
-demande une adhésion active au Developer Program pour créer un certificat de
-distribution Developer ID. Les références officielles sont
+Cette partie concerne uniquement le mainteneur qui souhaite éviter la
+confirmation manuelle du premier lancement. Elle n'est pas nécessaire pour
+publier une archive signée ad hoc. Apple demande une adhésion active au
+Developer Program pour créer un certificat de distribution Developer ID. Les
+références officielles sont
 [Signing Mac Software with Developer ID](https://developer.apple.com/developer-id/)
 et
 [Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
@@ -192,11 +210,13 @@ printf '%s' 'TEAMID' | gh secret set APPLE_TEAM_ID
 printf '%s' 'xxxx-xxxx-xxxx-xxxx' | gh secret set APPLE_APP_SPECIFIC_PASSWORD
 ```
 
-Le workflow vérifie les secrets avant la compilation macOS. Il importe le
-`.p12` dans un trousseau éphémère, signe le binaire puis `PRIORIS.app`, attend
-le résultat de notarisation, agrafe et valide le ticket, et lance enfin
-`spctl --assess`. Si l'une de ces opérations échoue, aucun job de publication
-Rust ne peut démarrer. Le trousseau temporaire est supprimé même après échec.
+Le workflow accepte exactement deux configurations : aucun secret produit la
+signature ad hoc gratuite ; les six secrets produisent la signature Developer
+ID et la notarisation. Un ensemble partiel est refusé pour éviter une release
+ambiguë. Dans le second cas, il importe le `.p12` dans un trousseau éphémère,
+signe le binaire puis `PRIORIS.app`, attend le résultat de notarisation, agrafe
+et valide le ticket, et lance enfin `spctl --assess`. Une erreur empêche la
+publication. Le trousseau temporaire est supprimé même après échec.
 
 ### 1.3 Prérequis
 

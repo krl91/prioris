@@ -92,9 +92,10 @@ vault, SQLite, Telegram nor any network client.
 
 The experimental native port lives in [`rust/`](rust/README.md). Its releases
 use `rust-v*` tags and remain separate from the Python `v0.x` releases. Starting
-with Rust 0.2.4, the macOS archive contains a Developer ID-signed and
-Apple-notarized `PRIORIS.app` that launches by double-clicking; the workflow
-refuses to publish when a Gatekeeper check fails.
+with Rust 0.2.4, the macOS archive contains `PRIORIS.app`. Without a paid Apple
+account it is signed ad hoc, so the user approves the first launch in **System
+Settings > Privacy & Security > Open Anyway**. When all six Apple secrets are
+configured, the same workflow uses Developer ID signing and notarization.
 
 ## Install from the Release
 

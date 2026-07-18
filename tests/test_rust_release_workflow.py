@@ -12,11 +12,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_rust_macos_release_requires_real_apple_signing() -> None:
-    """Tagged releases must require Developer ID signing and notarization."""
+def test_rust_macos_release_supports_both_signing_modes() -> None:
+    """A release uses Apple credentials when complete, or ad-hoc signing."""
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "Require Apple release credentials" in workflow
+    assert "Detect Apple release credentials" in workflow
     assert "APPLE_CERTIFICATE_P12_BASE64" in workflow
     assert "APPLE_CERTIFICATE_PASSWORD" in workflow
     assert "APPLE_SIGNING_IDENTITY" in workflow
@@ -25,9 +25,12 @@ def test_rust_macos_release_requires_real_apple_signing() -> None:
     assert "APPLE_APP_SPECIFIC_PASSWORD" in workflow
     assert 'codesign --force --sign "$APPLE_SIGNING_IDENTITY"' in workflow
     assert "--options runtime --timestamp" in workflow
-    assert "Ad-hoc sign macOS .app (no Developer ID credentials)" not in workflow
-    assert "Add allow-macos.sh to macOS release bundle" not in workflow
-    assert "steps.apple-creds.outputs.available != 'true'" not in workflow
+    assert "Partial Apple credential set" in workflow
+    assert workflow.count("steps.apple-creds.outputs.available == 'true'") >= 4
+    assert "Ad-hoc sign macOS application without Apple credentials" in workflow
+    assert "steps.apple-creds.outputs.available == 'false'" in workflow
+    assert 'codesign --force --sign - --options runtime --timestamp=none "$app"' in workflow
+    assert "OUVRIR-MACOS.md" in workflow
 
 
 def test_python_release_ignores_rust_release_tags() -> None:
@@ -49,7 +52,8 @@ def test_rust_macos_release_is_notarized_and_gatekeeper_assessed() -> None:
     assert "spctl --assess --type execute" in workflow
 
 
-def test_rust_macos_launcher_does_not_bypass_quarantine() -> None:
+def test_rust_macos_distribution_does_not_bypass_quarantine() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
     launcher = (ROOT / "rust" / "scripts" / "run.sh").read_text(encoding="utf-8")
     self_test = (ROOT / "rust" / "scripts" / "self-test.sh").read_text(
         encoding="utf-8"
@@ -57,5 +61,11 @@ def test_rust_macos_launcher_does_not_bypass_quarantine() -> None:
 
     assert "PRIORIS.app/Contents/MacOS/prioris" in launcher
     assert "PRIORIS.app/Contents/MacOS/prioris" in self_test
-    assert "com.apple.quarantine" not in launcher
-    assert "com.apple.quarantine" not in self_test
+    instructions = (ROOT / "rust" / "OUVRIR-MACOS.md").read_text(encoding="utf-8")
+
+    for content in (workflow, launcher, self_test, instructions):
+        assert "com.apple.quarantine" not in content
+        assert "xattr -d" not in content
+        assert "xattr -dr" not in content
+    assert "Ouvrir quand même" in instructions
+    assert "Open Anyway" in instructions

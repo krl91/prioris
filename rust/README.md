@@ -19,11 +19,13 @@ puis télécharge uniquement l'archive correspondant à ton système :
 
 Décompresse l'archive. Sous macOS, conserve `PRIORIS.app`, `config.toml`,
 `models/` et `ObsidianVault/` dans le même dossier, puis double-clique sur
-`PRIORIS.app`. L'application est signée Developer ID, notarée par Apple et son
-ticket est agrafé au bundle. Le lancement en terminal reste disponible avec
-`scripts/run.sh`. Sous Linux, utilise `scripts/run.sh`; sous Windows,
-`scripts/run.ps1`. `SHA256SUMS.txt`, joint à la release, permet de vérifier
-l'intégrité des archives.
+`PRIORIS.app`. Par défaut, l'application est signée ad hoc gratuitement. Au
+premier blocage, ferme l'alerte, ouvre **Réglages Système > Confidentialité et
+sécurité**, puis clique sur **Ouvrir quand même** et confirme. La procédure
+bilingue complète est fournie dans `OUVRIR-MACOS.md`. Le lancement en terminal
+reste disponible avec `scripts/run.sh`. Sous Linux, utilise `scripts/run.sh` ;
+sous Windows, `scripts/run.ps1`. `SHA256SUMS.txt`, joint à la release, permet de
+vérifier l'intégrité des archives avant d'autoriser l'application.
 
 ## État fonctionnel
 
@@ -119,15 +121,22 @@ sauvegarde ; Telegram et le chemin SQLite nécessitent un redémarrage. Sous
 Unix, le fichier sauvegardé reçoit les permissions `0600`.
 
 Dans une archive distribuée, `scripts/run.sh` lance directement l'application.
-Sur macOS, il exécute le même Mach-O que `PRIORIS.app`. Le workflow refuse de
-publier un tag Rust si la signature Developer ID, la notarisation, l'agrafage
-du ticket ou l'évaluation Gatekeeper échoue. Aucun retrait de quarantaine ne
-sert à contourner Gatekeeper.
+Sur macOS, il exécute le même Mach-O que `PRIORIS.app`. Sans secrets Apple, le
+workflow applique une signature ad hoc et inclut les instructions d'autorisation
+manuelle. Avec les six secrets, il exige la signature Developer ID, la
+notarisation, l'agrafage du ticket et l'évaluation Gatekeeper. Aucun script Rust
+ne retire la quarantaine.
 
-## Signature et notarisation macOS pour les mainteneurs
+## Modes de signature macOS pour les mainteneurs
 
-Le dépôt GitHub doit contenir ces secrets Actions avant de pousser un tag
-`rust-v*` :
+Le workflow accepte deux configurations :
+
+- **gratuite** : aucun secret Apple, signature ad hoc et confirmation manuelle
+  au premier lancement ;
+- **Developer ID** : les six secrets ci-dessous, signature et notarisation
+  reconnues par Apple.
+
+Un jeu partiel de secrets est refusé. Pour activer le second mode, ajoute :
 
 | Secret | Contenu |
 |---|---|

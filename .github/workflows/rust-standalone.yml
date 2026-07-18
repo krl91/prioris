@@ -96,7 +96,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-      - name: Require Apple release credentials
+      - name: Detect Apple release credentials
+        id: apple-creds
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -106,7 +107,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
-          missing=""
+          present=0
           for name in \
             APPLE_CERTIFICATE_P12_BASE64 \
             APPLE_CERTIFICATE_PASSWORD \
@@ -116,15 +117,20 @@ jobs:
             APPLE_APP_SPECIFIC_PASSWORD
           do
             value="${!name:-}"
-            if [ -z "$value" ]; then
-              missing="$missing $name"
+            if [ -n "$value" ]; then
+              present=$((present + 1))
             fi
           done
-          if [ -n "$missing" ]; then
-            echo "Missing required Apple release secrets:$missing" >&2
+          if [ "$present" -eq 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No Apple credentials: the release will be signed ad hoc."
+          elif [ "$present" -eq 6 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Apple credentials found: Developer ID signing and notarization enabled."
+          else
+            echo "Partial Apple credential set ($present/6). Configure all six secrets or remove all of them." >&2
             exit 1
           fi
-          echo "All Apple Developer ID signing and notarization credentials are available."
       - name: Build optimized native binary
         working-directory: rust
         run: cargo build --locked --release --features "${{ matrix.features }}"
@@ -154,16 +160,7 @@ jobs:
           mkdir -p dev-bundle-macos
           cp "rust/target/release/${{ matrix.binary }}" dev-bundle-macos/
           cp rust/config.example.toml dev-bundle-macos/config.toml
-          cat > dev-bundle-macos/allow-macos.sh << 'ALLOW_EOF'
-          #!/bin/sh
-          # Run once after downloading to allow macOS to execute prioris.
-          # Removes the quarantine attribute macOS sets on downloaded files.
-          #
-          # Usage: chmod +x allow-macos.sh && ./allow-macos.sh
-          xattr -dr com.apple.quarantine "$(dirname "$0")"
-          echo "Done – prioris is now allowed to run."
-          ALLOW_EOF
-          chmod +x dev-bundle-macos/allow-macos.sh
+          cp rust/OUVRIR-MACOS.md dev-bundle-macos/
           ditto -c -k --keepParent dev-bundle-macos prioris-dev-macos-arm64.zip
 
       - name: Upload dev macOS artifact (workflow_dispatch only)
@@ -239,7 +236,7 @@ jobs:
           plutil -lint "$app/Contents/Info.plist"
           test -x "$app/Contents/MacOS/prioris"
       - name: Import Apple Developer ID certificate
-        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'true'
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -258,7 +255,7 @@ jobs:
           security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_IDENTITY"
           echo "APPLE_KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
       - name: Sign macOS application with Developer ID
-        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'true'
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
@@ -269,8 +266,17 @@ jobs:
             --options runtime --timestamp "$app"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Authority=Developer ID Application:"
+      - name: Ad-hoc sign macOS application without Apple credentials
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'false'
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          codesign --force --sign - --options runtime --timestamp=none "$app/Contents/MacOS/prioris"
+          codesign --force --sign - --options runtime --timestamp=none "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Signature=adhoc"
+          cp rust/OUVRIR-MACOS.md "bundle/$BUNDLE_NAME/"
       - name: Notarize and staple macOS application
-        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -322,7 +328,7 @@ jobs:
           compression-level: 0
           retention-days: 3
       - name: Remove temporary Apple signing keychain
-        if: always() && startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        if: always() && startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS' && steps.apple-creds.outputs.available == 'true'
         run: |
           if [ -n "${APPLE_KEYCHAIN_PATH:-}" ]; then
             security delete-keychain "$APPLE_KEYCHAIN_PATH" || true

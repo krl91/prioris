@@ -137,14 +137,23 @@ with Rust 0.2.4, the macOS archive contains a real `PRIORIS.app` bundle:
 3. keep `PRIORIS.app`, `config.toml`, `models/` and `ObsidianVault/` together;
 4. double-click `PRIORIS.app`.
 
-The app uses Hardened Runtime, is signed with a **Developer ID Application**
-certificate, submitted to Apple with `notarytool`, stapled and validated, then
-assessed with `spctl`. `scripts/run.sh` launches the same signed Mach-O from a
-terminal. Windows and Linux continue to use `scripts/run.ps1` and
-`scripts/run.sh` respectively.
+Without Apple secrets, the app uses free ad-hoc signing with Hardened Runtime.
+The first launch may say that Apple cannot verify the application. Close that
+alert, open **System Settings > Privacy & Security**, scroll to **Security**,
+click **Open Anyway** next to the PRIORIS message, authenticate if requested,
+then confirm with **Open**. This is required only once. The archive includes the
+same bilingual procedure in `OUVRIR-MACOS.md`; no script removes quarantine
+automatically. Verify the official archive against `SHA256SUMS.txt` before
+approving it.
 
-Maintainers must configure these GitHub Actions secrets before creating a
-`rust-v*` tag: `APPLE_CERTIFICATE_P12_BASE64`,
+When all six Apple secrets are available, the workflow instead signs with a
+**Developer ID Application** certificate, submits the app with `notarytool`,
+staples and validates the ticket, then assesses it with `spctl`. **Open Anyway**
+should not be required in that mode. `scripts/run.sh` launches the same Mach-O.
+Windows and Linux use `scripts/run.ps1` and `scripts/run.sh` respectively.
+
+Maintainers may configure these optional GitHub Actions secrets to avoid the
+manual first-launch approval: `APPLE_CERTIFICATE_P12_BASE64`,
 `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
 `APPLE_TEAM_ID` and `APPLE_APP_SPECIFIC_PASSWORD`. The first value is the
 single-line Base64 encoding of a password-protected `.p12` containing the
@@ -152,10 +161,11 @@ Developer ID Application certificate and its private key. The signing identity
 must be its full name, such as
 `Developer ID Application: Example Name (TEAMID)`.
 
-The workflow checks these values before the macOS build, imports the certificate
-into an ephemeral keychain, signs the binary and app, waits for Apple
-notarization, staples the ticket and runs Gatekeeper assessment. A failed or
-missing step prevents publication. See Apple's official documentation for
+The workflow accepts either zero secrets for free ad-hoc signing or all six for
+Developer ID signing and notarization. A partial set is rejected. With all six,
+it imports the certificate into an ephemeral keychain, signs the binary and
+app, waits for Apple notarization, staples the ticket and runs Gatekeeper
+assessment. A failed signing step prevents publication. See Apple's official documentation for
 [Developer ID](https://developer.apple.com/developer-id/) and
 [macOS notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 

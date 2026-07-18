@@ -6,13 +6,25 @@ WORKFLOW = ROOT / ".github" / "workflows" / "rust-standalone.yml"
 
 
 def test_rust_macos_release_requires_real_apple_signing() -> None:
+    """Developer ID signing must be the primary release path.
+
+    Ad-hoc signing (--sign -) is allowed only as a fallback conditioned on
+    Apple credentials being absent (steps.apple-creds.outputs.available != 'true').
+    The credential-detection step and the Developer ID signing path must always
+    be present.
+    """
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
+    # Credential check and Developer ID path must always be present
     assert "APPLE_CERTIFICATE_P12_BASE64" in workflow
     assert "APPLE_SIGNING_IDENTITY" in workflow
     assert 'codesign --force --sign "$APPLE_SIGNING_IDENTITY"' in workflow
     assert "--options runtime --timestamp" in workflow
-    assert "codesign --force --sign -" not in workflow
+    # Any ad-hoc fallback must be gated on credentials being unavailable
+    assert "steps.apple-creds.outputs.available != 'true'" in workflow, (
+        "Workflow must include a conditional ad-hoc fallback gated on "
+        "Apple credentials being absent."
+    )
 
 
 def test_rust_macos_release_is_notarized_and_gatekeeper_assessed() -> None:

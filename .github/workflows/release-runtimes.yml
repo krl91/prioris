@@ -348,8 +348,19 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force runtime/windows-x64 | Out-Null
           Copy-Item build/bin/Release/llama-simple.exe -Destination runtime/windows-x64 -Force
-          Get-ChildItem build/bin/Release -File -Include *.dll |
+          Get-ChildItem build/bin/Release -File -Filter *.dll |
             Copy-Item -Destination runtime/windows-x64 -Force
+          foreach ($required in @(
+            "llama-simple.exe",
+            "ggml-base.dll",
+            "ggml-cpu.dll",
+            "ggml.dll",
+            "llama.dll"
+          )) {
+            if (!(Test-Path "runtime/windows-x64/$required")) {
+              throw "Missing Windows runtime file: $required"
+            }
+          }
           $forbidden = Get-ChildItem runtime/windows-x64 -File |
             Where-Object { $_.Name -match 'server|rpc|llama-cli' }
           if ($forbidden) {

@@ -130,6 +130,45 @@ jobs:
         shell: pwsh
         run: .\rust\target\release\${{ matrix.binary }} --self-test
 
+      # For official releases (rust-v* tag + Apple secrets) the Developer ID
+      # signing + notarisation steps below replace this signature.
+      # For PRs and workflow_dispatch (no Apple credentials required), this
+      # ad-hoc Hardened Runtime signature is the only one applied: macOS will
+      # show a one-time "unidentified developer" warning that the user can
+      # dismiss via System Settings > Privacy & Security > Allow Anyway.
+      - name: Ad-hoc sign macOS binary (non-release builds)
+        if: runner.os == 'macOS' && !startsWith(github.ref, 'refs/tags/rust-v')
+        run: |
+          codesign --force --sign - --options runtime --timestamp=none \
+            "rust/target/release/${{ matrix.binary }}"
+          codesign --verify --verbose "rust/target/release/${{ matrix.binary }}"
+
+      - name: Package ad-hoc signed binary for dev testing (workflow_dispatch)
+        if: runner.os == 'macOS' && github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p dev-bundle-macos
+          cp "rust/target/release/${{ matrix.binary }}" dev-bundle-macos/
+          cp rust/config.example.toml dev-bundle-macos/config.toml
+          cat > dev-bundle-macos/allow-macos.sh << 'ALLOW_EOF'
+          #!/bin/sh
+          # Run once after downloading to allow macOS to execute prioris.
+          # Removes the quarantine attribute macOS sets on downloaded files.
+          #
+          # Usage: chmod +x allow-macos.sh && ./allow-macos.sh
+          xattr -dr com.apple.quarantine "$(dirname "$0")"
+          echo "Done – prioris is now allowed to run."
+          ALLOW_EOF
+          chmod +x dev-bundle-macos/allow-macos.sh
+          ditto -c -k --keepParent dev-bundle-macos prioris-dev-macos-arm64.zip
+
+      - name: Upload dev macOS artifact (workflow_dispatch only)
+        if: runner.os == 'macOS' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: prioris-dev-macos-arm64
+          path: prioris-dev-macos-arm64.zip
+          retention-days: 7
+
       - name: Prepare release bundle (Unix)
         if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os != 'Windows'
         run: |

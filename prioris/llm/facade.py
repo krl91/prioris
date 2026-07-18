@@ -111,7 +111,7 @@ class LLMFacade:
             t0 = time.monotonic()
             try:
                 raw = self._client.chat(prompts.INTERVIEWER_SYSTEM, payload,
-                                        max_tokens=96)
+                                        max_tokens=160)
                 result = _validate(axis, _extract_json(raw))
             except (LLMError, ValueError, KeyError, json.JSONDecodeError) as e:
                 self.last_error = f"tentative {attempt}/{MAX_ATTEMPTS} : {e}"
@@ -141,7 +141,7 @@ class LLMFacade:
             t0 = time.monotonic()
             try:
                 raw = self._client.chat(prompts.QUESTION_INTERPRETER_SYSTEM, payload,
-                                        max_tokens=96)
+                                        max_tokens=160)
                 data = _extract_json(raw)
                 _require_confidence(data)
                 value = str(data["value"]).strip()

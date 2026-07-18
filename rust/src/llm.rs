@@ -519,7 +519,7 @@ fn token_budget(system: &str, configured: usize) -> usize {
     let budget = if system == "PRIORIS_HEALTH" {
         8
     } else if system == INTERPRETER_SYSTEM || system == QUESTION_SYSTEM {
-        96
+        160
     } else if system == CHALLENGE_ANSWER_SYSTEM {
         128
     } else if system == CHALLENGE_SYSTEM {
@@ -543,7 +543,7 @@ fn schema_for(system: &str) -> Value {
             json!({
                 "valeur": {"type": "integer", "minimum": 0, "maximum": 5},
                 "incertitude": {"type": "integer", "minimum": 0, "maximum": 2},
-                "reformulation": {"type": "string"}, "status": status,
+                "reformulation": {"type": "string", "maxLength": 240}, "status": status,
                 "confidence": confidence
             }),
             vec![
@@ -559,7 +559,7 @@ fn schema_for(system: &str) -> Value {
             json!({
                 "value": {"type": "string"},
                 "incertitude": {"type": "integer", "minimum": 0, "maximum": 2},
-                "reformulation": {"type": "string"}, "status": status,
+                "reformulation": {"type": "string", "maxLength": 240}, "status": status,
                 "confidence": confidence
             }),
             vec![
@@ -817,5 +817,11 @@ mod tests {
     fn disabled_provider_is_explicit() {
         let llm = LlmService::new(LlmConfig::default());
         assert!(matches!(llm.health_check(), Err(LlmError::Disabled)));
+    }
+
+    #[test]
+    fn interpretation_budget_leaves_room_for_complete_json() {
+        assert_eq!(token_budget(INTERPRETER_SYSTEM, 512), 160);
+        assert_eq!(token_budget(QUESTION_SYSTEM, 120), 120);
     }
 }

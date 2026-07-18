@@ -374,6 +374,14 @@ def test_nlu_valide():
     assert r.axis == Axis.BLK and r.reformulation
 
 
+def test_nlu_garde_assez_de_tokens_pour_fermer_le_json():
+    transport = fake_transport(VALID)
+    facade = LLMFacade(ChatClient(
+        LLMConfig(enabled=True, provider="ollama", model="test"), transport))
+    assert facade.interpret_answer(Axis.BLK, "Qui est bloqué ?", "Marie attend")
+    assert transport.calls[0]["payload"]["max_tokens"] == 160
+
+
 def test_nlu_json_dans_cloture_markdown():
     r = facade_with(f"```json\n{VALID}\n```").interpret_answer(
         Axis.BLK, "q", "texte")

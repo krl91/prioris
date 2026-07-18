@@ -372,7 +372,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `214 passed`.
+Résultat attendu : `215 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,7 +391,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `214 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `215 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.6 Rappels pour Obsidian et Windows
@@ -837,7 +837,7 @@ visible (`/llm` ou bouton **LLM**). Pour `/info`, un échec LLM réel est affich
 comme une erreur d'analyse, pas comme « aucune modification proposée ».
 
 Les appels utilisent une température nulle et un budget de sortie adapté :
-environ 96 tokens pour interpréter un axe/choix, 128 pour une réponse de
+environ 160 tokens pour interpréter un axe/choix, 128 pour une réponse de
 challenge, 192 pour générer les trois challenges et 320 pour `/info`, toujours
 bornés par `max_tokens`. Le modèle peut répondre `status="abstain"`; une
 confiance inférieure à `0,55` ou une abstention déclenche le repli manuel au
@@ -1433,7 +1433,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 214 tests automatisés passent localement dans le dépôt source
+**État tests** : 215 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

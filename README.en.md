@@ -152,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `214 passed`.
+Expected result in a full source repository clone: `215 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -305,7 +305,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-214 tests pass locally. Remaining possible improvements: advanced scenario
+215 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

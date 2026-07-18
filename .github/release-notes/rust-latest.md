@@ -10,6 +10,8 @@
   serveur et sans port local.
 - Budgets de tokens par opération, température nulle, abstention explicite et
   seuil de confiance.
+- Le budget axe/choix passe à 160 tokens et la reformulation est bornée afin
+  que le JSON contraint soit toujours terminé lors du test GGUF réel.
 - `/info` transmet au LLM une présélection déterministe de cinq tâches maximum
   et rejette les identifiants extérieurs.
 - Affichage de la robustesse dans la GUI et Telegram ; tests et `clippy` propres.

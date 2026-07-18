@@ -242,7 +242,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `214 passed`.
+Expected result: `215 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -261,7 +261,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `214 passed`.
+Expected result: `215 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -644,7 +644,7 @@ and are migrated to the short format by **Sync Obsidian**.
 The GUI shows a green/red LLM status indicator. Telegram and GUI diagnostics use
 warm-up retries and write details to `logs/llm.log`.
 
-Calls use temperature zero and task-specific output budgets: about 96 tokens
+Calls use temperature zero and task-specific output budgets: about 160 tokens
 for an axis/option, 128 for one challenge answer, 192 for three challenge
 questions, and 320 for `/info`, always capped by `max_tokens`. Explicit
 `status="abstain"` or confidence below `0.55` triggers manual fallback.
@@ -669,7 +669,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 214 passing automated tests.
+- 215 passing automated tests.
 
 Still possible future work:
 

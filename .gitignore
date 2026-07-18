@@ -30,3 +30,7 @@ runtime/
 artifacts/
 vendor/
 wheelhouse/
+
+# Rust build output
+rust/target/
+rust/logs/

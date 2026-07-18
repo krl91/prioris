@@ -82,8 +82,15 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             202 tests automatisés
+tests/             205 tests automatisés
 ```
+
+Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
+produit un binaire Windows, Linux ou macOS sans Python et peut charger le GGUF
+Ministral directement dans le processus, sans serveur ni port. Consulte son
+README pour l'état exact de la parité fonctionnelle et les limites actuelles.
+Ses releases utilisent des tags `rust-v*` et restent séparées des releases
+Python `v0.x`.
 
 Contrainte vérifiée par `tests/test_architecture.py` : `core/` n'importe ni
 store, ni bot, ni vault, ni SQLite, ni Telegram, ni client réseau.
@@ -154,7 +161,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `202 passed`.
+Résultat attendu dans un clone complet du dépôt source : `205 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -243,14 +250,25 @@ calcul.
 
 - Une question affichée attend toujours une réponse. Une réponse LLM non
   confirmée n'est jamais utilisée.
-- Le quadrant est calculé sans LLM : urgence `U = 30% BLK + 40% CDR + 30% HOR`,
-  importance `I = 35% IMP + 25% INA + 20% IRR + 20% ALN`, puis `G = 60% I +
-  40% U`.
+- Les sept axes viennent de questions factuelles : `BLK` blocage réel
+  (ex. client bloqué), `CDR` coût du retard (ex. coût qui explose à une date),
+  `HOR` horizon de visibilité (ex. problème visible cette semaine), `IMP`
+  différence entre fait et non fait (ex. gain structurant), `INA` conséquence
+  d'un mois d'inaction (ex. crise), `IRR` irréversibilité (ex. décision non
+  rattrapable) et `ALN` alignement avec un objectif (ex. contribution directe).
+- Chaque valeur est normalisée par le maximum de son échelle. Ligne de calcul
+  exacte : `U = 30×BLK/5 + 40×CDR/4 + 30×HOR/4` ;
+  `I = 35×IMP/4 + 25×INA/4 + 20×IRR/3 + 20×ALN/3` ;
+  `G = 0,6×I + 0,4×U`.
 - Seuils : urgent si `U >= 55`, important si `I >= 50`. `Q1 -> P1`, `Q2 -> P2`,
   `Q3 -> P3`, `Q4 -> P4`.
-- Le plan du jour prend les P1 d'abord, puis P2/P3 selon
-  `score global + bonus échéance + bonus pépite + ajustement énergie`. Les P4
-  et les estimations inconnues ne sont jamais planifiées.
+- Valeur de planification : `V = G + bonus échéance (0 à 40) + bonus pépite
+  (0 ou 10) + ajustement énergie (-25 à +10, ou exclusion)`. Les P1 sont
+  examinées avant les P2/P3 ; les P4 et estimations inconnues sont exclues.
+
+Les échelles complètes, un exemple chiffré par axe, les valeurs express par
+défaut, les planchers et toutes les règles du plan sont détaillés dans
+[GUIDE.md](GUIDE.md), sections 2.5.2 à 2.5.4.
 
 ### Telegram
 
@@ -293,7 +311,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-202 tests passent localement. Les améliorations restantes envisagées sont :
+205 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

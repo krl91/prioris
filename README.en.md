@@ -78,11 +78,14 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             202 automated tests
+tests/             205 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
 vault, SQLite, Telegram nor any network client.
+
+The experimental native port lives in [`rust/`](rust/README.md). Its releases
+use `rust-v*` tags and remain separate from the Python `v0.x` releases.
 
 ## Install from the Release
 
@@ -149,7 +152,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `202 passed`.
+Expected result in a full source repository clone: `205 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -234,14 +237,25 @@ explained and confirmed before it can affect the calculation.
 
 - One displayed question always expects one answer. An unconfirmed LLM
   interpretation is never used.
-- The quadrant is calculated without the LLM: urgency `U = 30% BLK + 40% CDR +
-  30% HOR`, importance `I = 35% IMP + 25% INA + 20% IRR + 20% ALN`, then `G =
-  60% I + 40% U`.
+- The seven axes come from factual questions: `BLK` actual blockage (for
+  example, a blocked client), `CDR` cost of delay (a cost cliff at a date),
+  `HOR` visibility horizon (visible this week), `IMP` difference between done
+  and not done (a structural gain), `INA` consequence of one month of inaction
+  (a crisis), `IRR` irreversibility (cannot be recovered), and `ALN` alignment
+  with a goal (direct contribution).
+- Every value is normalized by the maximum of its scale. Exact calculation:
+  `U = 30×BLK/5 + 40×CDR/4 + 30×HOR/4`;
+  `I = 35×IMP/4 + 25×INA/4 + 20×IRR/3 + 20×ALN/3`;
+  `G = 0.6×I + 0.4×U`.
 - Thresholds: urgent if `U >= 55`, important if `I >= 50`. `Q1 -> P1`, `Q2 ->
   P2`, `Q3 -> P3`, `Q4 -> P4`.
-- The daily plan considers P1 first, then P2/P3 by `global score + deadline
-  bonus + gem bonus + energy adjustment`. P4 tasks and unknown estimates are
-  never scheduled.
+- Planning value: `V = G + deadline bonus (0 to 40) + gem bonus (0 or 10) +
+  energy adjustment (-25 to +10, or exclusion)`. P1 tasks are considered before
+  P2/P3; P4 tasks and unknown estimates are excluded.
+
+The complete scales, one worked example per axis, express-mode defaults, score
+floors, and every planning rule are documented in [GUIDE.en.md](GUIDE.en.md),
+sections 6.2 to 6.4.
 
 ### Telegram
 
@@ -284,7 +298,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-202 tests pass locally. Remaining possible improvements: advanced scenario
+205 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

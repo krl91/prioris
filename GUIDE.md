@@ -372,7 +372,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `202 passed`.
+Résultat attendu : `205 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -391,7 +391,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `202 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `205 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.6 Rappels pour Obsidian et Windows
@@ -1096,9 +1096,9 @@ par ce flux :
 
 Le calcul final est ensuite déterministe et n'appelle plus le LLM :
 
-- urgence `U` = `30% BLK + 40% CDR + 30% HOR`
-- importance `I` = `35% IMP + 25% INA + 20% IRR + 20% ALN`
-- score global `G` = `60% I + 40% U`
+- urgence `U = 30×BLK/5 + 40×CDR/4 + 30×HOR/4`
+- importance `I = 35×IMP/4 + 25×INA/4 + 20×IRR/3 + 20×ALN/3`
+- score global `G = 0,6×I + 0,4×U`
 - seuil urgent : `U >= 55`
 - seuil important : `I >= 50`
 - quadrant : `Q1` si urgent et important, `Q2` si important seul, `Q3` si
@@ -1109,6 +1109,144 @@ Les planchers protègent certains cas : deadline réelle très proche, forte
 irréversibilité, contribution majeure à un objectif. Les biais sont détectés
 après ce calcul en comparant les axes, le résultat calculé et ton classement
 instinctif.
+
+### 2.5.2 Référence exhaustive des paramètres
+
+Les sept axes sont les **seules entrées pondérées du score**. Une réponse de
+bouton, une réponse libre interprétée puis confirmée, une clarification ou une
+question miroir aboutissent toutes au même résultat : une valeur entière sur
+l'échelle de l'axe concerné. La date confirmée peut seulement activer le
+plancher déterministe décrit plus bas. Le LLM ne fournit jamais directement
+`U`, `I`, `G`, le quadrant ou la priorité.
+
+| Axe | Rattaché à | Question factuelle et échelle complète | Exemple chiffré |
+|---|---|---|---|
+| `BLK` blocage réel, `0..5` | Urgence, poids 30 | « Qui est bloqué si ce n'est pas fait cette semaine ? » `0` personne ; `1` moi seul ; `2` une autre personne ; `3` une équipe ; `4` le client ; `5` plusieurs équipes. | Un client réellement empêché d'avancer donne `BLK=4`, donc `30×4/5 = 24` points d'urgence. Une personne seulement en attente n'est pas forcément bloquée. |
+| `CDR` coût du retard, `0..4` | Urgence, poids 40 | « Comment le coût évolue-t-il si tu attends ? » `0` rien ; `1` accumulation douce ; `2` nette ; `3` aggravation croissante ; `4` falaise à une date. | Un dépôt impossible après vendredi donne `CDR=4`, soit `40×4/4 = 40` points d'urgence. |
+| `HOR` horizon, `0..4` | Urgence, poids 30 | « Quand le problème deviendra-t-il visible ? » `0` jamais ; `1` dans plus d'un mois ; `2` dans 2 à 4 semaines ; `3` cette semaine ; `4` déjà visible. | Une conséquence visible cette semaine donne `HOR=3`, soit `30×3/4 = 22,5` points d'urgence. |
+| `IMP` impact, `0..4` | Importance, poids 35 | `Quelle différence réelle entre « fait » et « pas fait » ?` `0` négligeable ; `1` confort ; `2` notable ; `3` majeure ; `4` structurante. | Une certification qui change réellement l'accès à un poste peut donner `IMP=3`, soit `35×3/4 = 26,25` points d'importance. |
+| `INA` coût d'un mois d'inaction, `0..4` | Importance, poids 25 | « Si personne n'y touche pendant un mois, que se passe-t-il concrètement ? » `0` rien ; `1` gêne ; `2` vrai problème ; `3` crise ; `4` dégâts irrécupérables. | Un mois sans agir crée un vrai problème mais pas une crise : `INA=2`, soit `25×2/4 = 12,5` points d'importance. |
+| `IRR` irréversibilité, `0..3` | Importance, poids 20 | « Peut-on revenir en arrière ou rattraper plus tard ? » `0` réversible ; `1` rattrapable avec effort ; `2` rattrapable jusqu'à une date ; `3` irréversible. | Une option récupérable seulement avant signature donne `IRR=2`, soit `20×2/3 = 13,33` points d'importance. |
+| `ALN` alignement objectif, `0..3` | Importance, poids 20 | « Cette tâche contribue-t-elle à un de tes objectifs de vie ? » `0` aucun ; `1` indirecte ; `2` directe ; `3` majeure. | Préparer l'examen décisif d'un objectif actif peut donner `ALN=3`, soit 20 points et le plancher d'importance décrit plus bas. |
+
+**Entretien express et valeurs dérivées.** Le flux express demande le
+classement instinctif, `INA`, `BLK`, `CDR`, `ALN` et l'estimation. S'il ne
+bascule pas en mode complet, les axes non demandés sont remplis de façon
+déterministe : `IMP = min(INA, 3)`, `IRR = 1`, et `HOR` vient de la date limite :
+`4` si elle est échue ou aujourd'hui, `3` à 1-7 jours, `2` à 8-30 jours,
+`1` au-delà de 30 jours, ou la médiane `2` sans date. Ces valeurs sont marquées
+« par défaut » dans la justification. Le mode complet demande explicitement
+`IMP`, `HOR` et `IRR`, puis l'effort et les métadonnées de biais.
+
+**Incertitude.** « Je ne sais pas » ne vaut pas zéro. La valeur est remplacée
+par la médiane conservatrice de l'axe : `BLK=2`, `CDR=2`, `HOR=2`, `IMP=2`,
+`INA=2`, `IRR=1`, `ALN=1`. L'évaluation devient provisoire. Une simple
+hésitation est enregistrée, mais ne remplace pas la valeur confirmée.
+
+**Paramètres qui ne rentrent pas directement dans le score.**
+
+| Paramètre | Question ou origine | Utilisation réelle | Exemple |
+|---|---|---|---|
+| Priorité instinctive `P1..P4` | « Instinctivement, tu la classes comment ? » | Déclenche éventuellement le mode complet, choisit les challenges et mesure l'écart/biais ; ne force jamais le quadrant. | Dire P1 puis obtenir P4 produit un écart de 3 niveaux à expliquer, pas une remontée artificielle du score. |
+| Date limite | Saisie à la création ou proposée par `/info` puis confirmée | Dérive `HOR` en express, déclenche le mode complet si elle est à moins de 7 jours, peut activer le plancher deadline et fournit le bonus du plan. | Une date à J+3 donne `HOR=3`; avec `CDR=4`, `U` est ensuite au minimum 70. |
+| Estimation | `<15`, `15-30`, `30-60`, `1-2 h`, `2-4 h`, `>4 h`, inconnue | Convertie respectivement en `10, 22, 45, 90, 180, 300` minutes ; sert à la pépite, au levier et à la capacité du plan. Une estimation inconnue rend l'évaluation provisoire et exclut la tâche du plan. | `30-60 min` vaut 45 minutes pour la planification. |
+| Effort | Faible, moyen, élevé | Ajuste la valeur selon l'énergie ; un effort élevé fait aussi de la tâche une tâche majeure. | À énergie 1, une P2 d'effort élevé est exclue ; une vraie P1 reste proposée avec avertissement. |
+| Demandeur | Moi, collègue, manager, client | Détection de biais uniquement, jamais le score. | Une demande client sans blocage ni coût du retard peut signaler un biais client. |
+| Visibilité `0..3` | Niveau d'exposition de la tâche | Détection des biais de visibilité et de bruit uniquement. | Une tâche très discutée avec `IMP<=1` et `INA<=1` est signalée comme bruit. |
+| Pression `0..3` | Pression ressentie | Détection du biais de culpabilité uniquement. | Pression forte avec `BLK<=1` et `INA<=1` déclenche un signal, sans ajouter de points. |
+
+### 2.5.3 Calcul exact du score et exemple complet
+
+Chaque axe est normalisé par son maximum avant application de son poids. Les
+trois scores restent donc compris entre 0 et 100 :
+
+```text
+U = 30 × BLK/5 + 40 × CDR/4 + 30 × HOR/4
+I = 35 × IMP/4 + 25 × INA/4 + 20 × IRR/3 + 20 × ALN/3
+G = 0,6 × I + 0,4 × U
+```
+
+Avant de calculer `G`, trois planchers déterministes sont appliqués dans cet
+ordre :
+
+1. date limite à 7 jours ou moins **et** `CDR=4` : `U = max(U, 70)` ;
+2. `IRR=3` **et** `INA>=3` : `I = max(I, 70)` ;
+3. `ALN=3` : `I = max(I, 55)`.
+
+Ces planchers ne rajoutent pas 70 points : ils remontent seulement un total
+inférieur au seuil indiqué. Le JSON de justification conserve les termes avant
+plancher et chaque ajustement avant/après.
+
+Le quadrant utilise ensuite `U >= 55` et `I >= 50` :
+
+| Urgent | Important | Quadrant | Priorité | Lecture |
+|---|---|---|---|---|
+| oui | oui | Q1 | P1 | faire en premier |
+| non | oui | Q2 | P2 | planifier et protéger |
+| oui | non | Q3 | P3 | déléguer ou traiter vite et petit |
+| non | non | Q4 | P4 | reporter ou abandonner |
+
+**Exemple complet : 45 minutes d'activité physique liée à un objectif.**
+Supposons `BLK=1`, `CDR=3`, `HOR=1`, `IMP=3`, `INA=2`, `IRR=1`, `ALN=3` :
+
+```text
+U = 30×1/5 + 40×3/4 + 30×1/4 = 6 + 30 + 7,5 = 43,5
+I = 35×3/4 + 25×2/4 + 20×1/3 + 20×3/3
+  = 26,25 + 12,5 + 6,67 + 20 = 65,42
+G = 0,6×65,42 + 0,4×43,5 = 56,65
+```
+
+`U < 55` et `I >= 50` donnent Q2/P2. Aucun plancher ne change ici le résultat,
+car `I` dépasse déjà 55. Avec une estimation connue de 45 minutes, cette tâche
+est aussi une **pépite** : `I >= 45` et durée `<= 60 min`. Son levier affiché
+est `I / max(durée_en_heures, 0,25)`, ici environ `87,2` points d'importance par
+heure. Le levier est informatif ; seul le bonus pépite de 10 intervient dans le
+plan du jour.
+
+### 2.5.4 Calcul exhaustif du plan du jour
+
+1. **Capacité utile.** PRIORIS prend `entier(capacité déclarée × 0,8)`. Quatre
+   heures maîtrisables donnent donc 192 minutes planifiables.
+2. **Éligibilité.** Une P4 ou une estimation inconnue est exclue avant le tri.
+3. **Valeur de tri.** Pour chaque candidate :
+
+```text
+V = G + bonus_pépite + bonus_échéance + ajustement_énergie
+```
+
+Le bonus pépite vaut `+10` si `I >= 45`, estimation connue et durée `<= 60 min`.
+Le bonus d'échéance est borné et dépend du nombre de jours restants :
+
+| Échéance | J<=0 | J<=1 | J<=3 | J<=7 | J<=14 | J<=30 | >30 ou aucune |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Bonus | +40 | +35 | +28 | +20 | +12 | +6 | 0 |
+
+L'ajustement d'énergie dépend de l'effort :
+
+| Énergie | Effort faible | Effort moyen | Effort élevé |
+|---|---:|---:|---:|
+| 1, très faible | 0 | -25 | exclu, sauf P1 |
+| 2, faible | 0 | 0 | -25 |
+| 3, moyenne | 0 | 0 | 0 |
+| 4 ou 5, forte/excellente | -10 | 0 | +10 |
+
+4. **Ordre.** Toutes les P1 éligibles sont triées par `V` décroissante et
+   examinées avant toute P2/P3. La capacité restante est ensuite remplie avec
+   les P2/P3, elles aussi par `V` décroissante. Une égalité est départagée par
+   l'identifiant de tâche, ce qui rend le plan reproductible.
+5. **Garde-fous.** Une tâche majeure est une tâche d'au moins 60 minutes ou
+   d'effort élevé ; le plan en contient au maximum 3. Une P1 exigeante à
+   énergie très faible reste considérée, mais reçoit un avertissement. Une P2
+   ou P3 incompatible est exclue.
+6. **Capacité insuffisante.** La tâche est prise entière si elle tient. Sinon,
+   si `G >= 60` et qu'il reste au moins 60 minutes, PRIORIS propose une tranche
+   « entamer 60 min ». Sinon elle est exclue pour capacité insuffisante.
+
+**Exemple de concurrence date/score, sans bonus pépite.** Une P2 à `G=72`,
+échéance J+30, effort moyen vaut `72+6=78`. Une P2 à `G=55`, échéance demain,
+vaut `55+35=90` : elle passe devant. En revanche, une P4 due aujourd'hui reste
+exclue malgré son bonus théorique, car l'éligibilité est vérifiée avant le
+calcul de `V`.
 
 ### 2.6 /scan — prioriser les tâches de ton vault (V0.3)
 
@@ -1167,7 +1305,7 @@ note les scores qui te semblent faux — si un axe est systématiquement mal
 posé, c'est l'algorithme qu'on ajustera (nouvelle `version_algo`), pas les
 scores à la main.
 
-### 2.6 Dépannage
+### 2.8 Dépannage
 
 | Symptôme | Cause probable | Remède |
 |---|---|---|
@@ -1206,7 +1344,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 202 tests automatisés passent localement dans le dépôt source
+**État tests** : 205 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

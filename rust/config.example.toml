@@ -1,0 +1,23 @@
+[telegram]
+token = ""
+
+[database]
+path = "prioris.db"
+
+[ui]
+language = "fr"
+
+[obsidian]
+vault_path = "ObsidianVault"
+prioris_dir = "PRIORIS"
+
+[llm]
+enabled = true
+provider = "local_gguf"
+model = "models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf"
+max_tokens = 512
+timeout_s = 120
+api_key = ""
+api_key_env = ""
+base_url = ""
+keep_warm = true

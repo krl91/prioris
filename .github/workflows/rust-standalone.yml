@@ -1,0 +1,225 @@
+name: Rust standalone CI and release
+
+on:
+  push:
+    tags:
+      - "rust-v*"
+  pull_request:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust-standalone.yml"
+      - "README.md"
+      - "README.en.md"
+      - "GUIDE.md"
+      - "GUIDE.en.md"
+  workflow_dispatch:
+
+concurrency:
+  group: rust-standalone-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MODEL_URL: https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_FILE: Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_SHA256: 9ed150d4367e68df0ac8e1540f6ddc65b42d0ee26378329d1ecbca60f93fc5f8
+
+jobs:
+  tests:
+    name: Tests before native builds
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libwayland-dev libx11-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Format
+        run: cargo fmt --check
+      - name: Unit and integration tests
+        run: cargo test --locked
+      - name: Static analysis
+        run: cargo clippy --locked --all-targets --features embedded-llm -- -D warnings
+      - name: Telegram-only compile check
+        run: cargo check --locked --no-default-features --features telegram
+      - name: Embedded LLM compile check
+        run: cargo check --locked --no-default-features --features embedded-llm
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: Linux x64
+            platform: linux-x64
+            binary: prioris
+            features: embedded-llm
+            extension: .tar.gz
+          - os: windows-2022
+            name: Windows x64
+            platform: windows-x64
+            binary: prioris.exe
+            features: embedded-llm
+            extension: .zip
+          - os: macos-15
+            name: macOS arm64
+            platform: macos-arm64
+            binary: prioris
+            features: embedded-llm,accelerate
+            extension: .zip
+    runs-on: ${{ matrix.os }}
+    env:
+      BUNDLE_NAME: prioris-${{ github.ref_name }}-${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux GUI build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libwayland-dev libx11-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Build optimized native binary
+        working-directory: rust
+        run: cargo build --locked --release --features "${{ matrix.features }}"
+      - name: Post-build executable self-test
+        if: runner.os != 'Windows'
+        run: ./rust/target/release/${{ matrix.binary }} --self-test
+      - name: Post-build executable self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\rust\target\release\${{ matrix.binary }} --self-test
+
+      - name: Prepare release bundle (Unix)
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os != 'Windows'
+        run: |
+          mkdir -p "bundle/$BUNDLE_NAME/models" "bundle/$BUNDLE_NAME/scripts"
+          cp "rust/target/release/${{ matrix.binary }}" "bundle/$BUNDLE_NAME/"
+          cp rust/config.example.toml "bundle/$BUNDLE_NAME/config.toml"
+          cp rust/README.md "bundle/$BUNDLE_NAME/README.md"
+          cp README.md "bundle/$BUNDLE_NAME/README-python.md"
+          cp README.en.md GUIDE.md GUIDE.en.md "bundle/$BUNDLE_NAME/"
+          cp -R ObsidianVault "bundle/$BUNDLE_NAME/"
+          cp rust/scripts/run.sh rust/scripts/self-test.sh "bundle/$BUNDLE_NAME/scripts/"
+          chmod +x "bundle/$BUNDLE_NAME/${{ matrix.binary }}" "bundle/$BUNDLE_NAME/scripts/"*.sh
+          printf '%s\n' "${GITHUB_REF_NAME#rust-}" > "bundle/$BUNDLE_NAME/VERSION.txt"
+          curl -L --fail --retry 3 --retry-delay 5 "$MODEL_URL" -o "bundle/$BUNDLE_NAME/models/$MODEL_FILE"
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "$MODEL_SHA256  bundle/$BUNDLE_NAME/models/$MODEL_FILE" | sha256sum -c -
+          else
+            echo "$MODEL_SHA256  bundle/$BUNDLE_NAME/models/$MODEL_FILE" | shasum -a 256 -c -
+          fi
+      - name: Prepare release bundle (Windows)
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "bundle/$env:BUNDLE_NAME/models", "bundle/$env:BUNDLE_NAME/scripts" | Out-Null
+          Copy-Item "rust/target/release/${{ matrix.binary }}" "bundle/$env:BUNDLE_NAME/"
+          Copy-Item "rust/config.example.toml" "bundle/$env:BUNDLE_NAME/config.toml"
+          Copy-Item "rust/README.md" "bundle/$env:BUNDLE_NAME/README.md"
+          Copy-Item "README.md" "bundle/$env:BUNDLE_NAME/README-python.md"
+          Copy-Item "README.en.md", "GUIDE.md", "GUIDE.en.md" "bundle/$env:BUNDLE_NAME/"
+          Copy-Item -Recurse "ObsidianVault" "bundle/$env:BUNDLE_NAME/"
+          Copy-Item "rust/scripts/run.ps1", "rust/scripts/self-test.ps1" "bundle/$env:BUNDLE_NAME/scripts/"
+          ($env:GITHUB_REF_NAME -replace '^rust-', '') | Set-Content "bundle/$env:BUNDLE_NAME/VERSION.txt"
+          curl.exe -L --fail --retry 3 --retry-delay 5 $env:MODEL_URL -o "bundle/$env:BUNDLE_NAME/models/$env:MODEL_FILE"
+          $actual = (Get-FileHash "bundle/$env:BUNDLE_NAME/models/$env:MODEL_FILE" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:MODEL_SHA256) { throw "Model SHA256 mismatch: $actual" }
+
+      - name: Sign macOS executable
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        run: |
+          codesign --force --sign - --options runtime --timestamp=none "bundle/$BUNDLE_NAME/${{ matrix.binary }}"
+          codesign --verify --strict --verbose=2 "bundle/$BUNDLE_NAME/${{ matrix.binary }}"
+      - name: Verify bundled LLM (Unix)
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os != 'Windows'
+        run: cd "bundle/$BUNDLE_NAME" && ./${{ matrix.binary }} --llm-smoke "models/$MODEL_FILE"
+      - name: Verify bundled LLM (Windows)
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'Windows'
+        shell: pwsh
+        run: Set-Location "bundle/$env:BUNDLE_NAME"; .\${{ matrix.binary }} --llm-smoke "models/$env:MODEL_FILE"
+
+      - name: Package Linux
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'Linux'
+        run: tar -czf "$BUNDLE_NAME.tar.gz" -C bundle "$BUNDLE_NAME"
+      - name: Package macOS
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'macOS'
+        run: ditto -c -k --keepParent "bundle/$BUNDLE_NAME" "$BUNDLE_NAME.zip"
+      - name: Package Windows
+        if: startsWith(github.ref, 'refs/tags/rust-v') && runner.os == 'Windows'
+        shell: pwsh
+        run: 7z a -tzip "$env:BUNDLE_NAME.zip" "bundle/$env:BUNDLE_NAME"
+      - name: Upload release archive
+        if: startsWith(github.ref, 'refs/tags/rust-v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-release-${{ matrix.platform }}
+          path: ${{ env.BUNDLE_NAME }}${{ matrix.extension }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
+  release:
+    name: Publish separate Rust release
+    if: startsWith(github.ref, 'refs/tags/rust-v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rust-release-*
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums and release notes
+        run: |
+          cd dist
+          sha256sum prioris-rust-v* > SHA256SUMS.txt
+          cd ..
+          version="${GITHUB_REF_NAME#rust-}"
+          echo "RELEASE_NAME=PRIORIS Rust $version" >> "$GITHUB_ENV"
+          cat > release-notes.md <<'EOF'
+          ## PRIORIS Rust __VERSION__
+
+          Première release autonome du port natif Rust. Elle est indépendante des releases Python `v0.x` et ne remplace pas leur statut « Latest ».
+
+          ### Téléchargement
+
+          - macOS Apple Silicon : `prioris-__TAG__-macos-arm64.zip`
+          - Windows x64 : `prioris-__TAG__-windows-x64.zip`
+          - Linux x64 : `prioris-__TAG__-linux-x64.tar.gz`
+          - Vérification : `SHA256SUMS.txt`
+
+          Chaque archive contient le binaire natif, `config.toml`, les scripts de lancement, `ObsidianVault` et le modèle Ministral 3B GGUF. Le modèle est chargé dans le processus, sans serveur et sans port local.
+
+          Cette version Rust est publiée en préversion : consultez le [README Rust](https://github.com/__REPOSITORY__/blob/__TAG__/rust/README.md) pour les limites de parité avec la version Python.
+          EOF
+          sed -i "s/__VERSION__/$version/g; s/__TAG__/$GITHUB_REF_NAME/g; s|__REPOSITORY__|$GITHUB_REPOSITORY|g" release-notes.md
+      - name: Create Rust GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true
+          prerelease: true
+          make_latest: false

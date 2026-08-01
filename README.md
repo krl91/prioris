@@ -87,16 +87,19 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             229 tests automatisés
+tests/             232 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
 produit un binaire Windows, Linux ou macOS sans Python et peut charger le GGUF
 Ministral directement dans le processus, sans serveur ni port. Consulte son
 README pour l'état exact de la parité fonctionnelle et les limites actuelles.
-Ses releases utilisent des tags `rust-v*` et restent séparées des releases
-Python `v0.x`. À partir de Rust 0.2.5, l'archive macOS contient une application
-`PRIORIS.app`. Sans compte Apple payant, elle est signée ad hoc : au premier
+Ses releases utilisent des tags `rust-v*` pour Apple Silicon et
+`rust-intel-v*` pour macOS Intel ; elles restent séparées des releases Python
+`v0.x`. Télécharge `prioris-rust-v0.2.5-macos-arm64.zip` sur un Mac Apple
+Silicon ou `prioris-rust-intel-v0.2.5-macos-x64.zip` sur un Mac Intel. À partir
+de Rust 0.2.5, l'archive macOS contient une application `PRIORIS.app`. Sans
+compte Apple payant, elle est signée ad hoc : au premier
 lancement, l'utilisateur l'autorise dans **Réglages Système > Confidentialité
 et sécurité > Ouvrir quand même**. Elle stocke ses données modifiables dans
 `~/Library/Application Support/PRIORIS` et reste compatible avec App
@@ -172,7 +175,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `229 passed`.
+Résultat attendu dans un clone complet du dépôt source : `232 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -337,7 +340,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-229 tests passent localement. Les améliorations restantes envisagées sont :
+232 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

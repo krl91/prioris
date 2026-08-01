@@ -1,0 +1,320 @@
+name: Rust macOS Intel CI and release
+
+on:
+  push:
+    tags:
+      - "rust-intel-v*"
+  pull_request:
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust-macos-intel.yml"
+      - ".github/release-notes/rust-intel-latest.md"
+      - "tests/test_rust_macos_intel_workflow.py"
+      - "ObsidianVault/**"
+      - "README.md"
+      - "README.en.md"
+      - "GUIDE.md"
+      - "GUIDE.en.md"
+  workflow_dispatch:
+
+concurrency:
+  group: rust-macos-intel-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MODEL_URL: https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/7564922f37fa5bbb62b87f09a55c12f1f91d7a6a/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_FILE: Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_SHA256: fd46fc371ff0509bfa8657ac956b7de8534d7d9baaa4947975c0648c3aa397f4
+
+jobs:
+  tests:
+    name: Tests before Intel build
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux GUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libwayland-dev libx11-dev libxi-dev libxkbcommon-dev libxkbcommon-x11-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          shared-key: rust-macos-intel-tests
+      - name: Format
+        run: cargo fmt --check
+      - name: Unit and integration tests
+        run: cargo test --locked
+      - name: Static analysis
+        run: cargo clippy --locked --all-targets --features embedded-llm -- -D warnings
+      - name: Telegram-only compile check
+        run: cargo check --locked --no-default-features --features telegram
+      - name: Embedded LLM compile check
+        run: cargo check --locked --no-default-features --features embedded-llm
+
+  build:
+    name: Build macOS Intel x64
+    needs: tests
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          shared-key: rust-macos-intel-build
+      - name: Define and validate version
+        run: |
+          cargo_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' rust/Cargo.toml | head -1)
+          if [[ "$GITHUB_REF" == refs/tags/rust-intel-v* ]]; then
+            version="${GITHUB_REF_NAME#rust-intel-v}"
+            if [ "$version" != "$cargo_version" ]; then
+              echo "Tag version $version does not match Cargo version $cargo_version" >&2
+              exit 1
+            fi
+          else
+            version="$cargo_version"
+          fi
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "BUNDLE_NAME=prioris-rust-intel-v$version-macos-x64" >> "$GITHUB_ENV"
+      - name: Verify Intel runner
+        run: |
+          test "$(uname -m)" = "x86_64"
+          sysctl -n machdep.cpu.brand_string
+      - name: Detect Apple release credentials
+        id: apple-creds
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          present=0
+          for name in \
+            APPLE_CERTIFICATE_P12_BASE64 \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_TEAM_ID \
+            APPLE_APP_SPECIFIC_PASSWORD
+          do
+            value="${!name:-}"
+            if [ -n "$value" ]; then
+              present=$((present + 1))
+            fi
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No Apple credentials: the Intel app will be signed ad hoc."
+          elif [ "$present" -eq 6 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Apple credentials found: Developer ID signing and notarization enabled."
+          else
+            echo "Partial Apple credential set ($present/6). Configure all six secrets or remove all of them." >&2
+            exit 1
+          fi
+      - name: Build optimized Intel binary
+        working-directory: rust
+        run: cargo build --locked --release --features embedded-llm,accelerate
+      - name: Verify Mach-O architecture
+        run: |
+          file rust/target/release/prioris | grep -F "Mach-O 64-bit executable x86_64"
+          test "$(lipo -archs rust/target/release/prioris)" = "x86_64"
+      - name: Post-build executable self-test
+        run: ./rust/target/release/prioris --self-test
+      - name: Run Intel-specific bundle runtime tests
+        working-directory: rust
+        run: cargo test --locked --release --bin prioris --features embedded-llm,accelerate
+      - name: Prepare standalone Intel bundle
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p "bundle/$BUNDLE_NAME/models" "bundle/$BUNDLE_NAME/scripts"
+          cp rust/target/release/prioris "bundle/$BUNDLE_NAME/"
+          cp rust/config.example.toml "bundle/$BUNDLE_NAME/config.toml"
+          cp rust/README.md "bundle/$BUNDLE_NAME/README.md"
+          cp README.md "bundle/$BUNDLE_NAME/README-python.md"
+          cp README.en.md GUIDE.md GUIDE.en.md "bundle/$BUNDLE_NAME/"
+          cp -R ObsidianVault "bundle/$BUNDLE_NAME/"
+          cp rust/scripts/run.sh rust/scripts/self-test.sh "bundle/$BUNDLE_NAME/scripts/"
+          chmod +x "bundle/$BUNDLE_NAME/prioris" "bundle/$BUNDLE_NAME/scripts/"*.sh
+          printf 'v%s\n' "$RELEASE_VERSION" > "bundle/$BUNDLE_NAME/VERSION.txt"
+          curl -L --fail --retry 3 --retry-delay 5 "$MODEL_URL" -o "bundle/$BUNDLE_NAME/models/$MODEL_FILE"
+          echo "$MODEL_SHA256  bundle/$BUNDLE_NAME/models/$MODEL_FILE" | shasum -a 256 -c -
+      - name: Create Intel macOS application bundle
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          mv "bundle/$BUNDLE_NAME/prioris" "$app/Contents/MacOS/prioris"
+          mv "bundle/$BUNDLE_NAME/models" "$app/Contents/Resources/models"
+          cp "bundle/$BUNDLE_NAME/config.toml" "$app/Contents/Resources/config.toml"
+          cp -R "bundle/$BUNDLE_NAME/ObsidianVault" "$app/Contents/Resources/ObsidianVault"
+          ln -s "PRIORIS.app/Contents/Resources/models" "bundle/$BUNDLE_NAME/models"
+          cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDevelopmentRegion</key><string>fr</string>
+            <key>CFBundleDisplayName</key><string>PRIORIS</string>
+            <key>CFBundleExecutable</key><string>prioris</string>
+            <key>CFBundleIdentifier</key><string>io.github.krl91.prioris</string>
+            <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+            <key>CFBundleName</key><string>PRIORIS</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>$RELEASE_VERSION</string>
+            <key>CFBundleVersion</key><string>$GITHUB_RUN_NUMBER</string>
+            <key>LSMinimumSystemVersion</key><string>13.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$app/Contents/Info.plist"
+          test "$(lipo -archs "$app/Contents/MacOS/prioris")" = "x86_64"
+          test -f "$app/Contents/Resources/config.toml"
+          test -f "$app/Contents/Resources/models/$MODEL_FILE"
+          test -d "$app/Contents/Resources/ObsidianVault"
+      - name: Import Apple Developer ID certificate
+        if: (startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch') && steps.apple-creds.outputs.available == 'true'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          certificate="$RUNNER_TEMP/apple-developer-id.p12"
+          keychain="$RUNNER_TEMP/prioris-intel-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_IDENTITY"
+          echo "APPLE_KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
+      - name: Sign Intel application with Developer ID
+        if: (startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch') && steps.apple-creds.outputs.available == 'true'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" \
+            --options runtime --timestamp "$app/Contents/MacOS/prioris"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" \
+            --options runtime --timestamp "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Authority=Developer ID Application:"
+      - name: Ad-hoc sign Intel application without Apple credentials
+        if: (startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch') && steps.apple-creds.outputs.available == 'false'
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          codesign --force --sign - --options runtime --timestamp=none "$app/Contents/MacOS/prioris"
+          codesign --force --sign - --options runtime --timestamp=none "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv --verbose=4 "$app" 2>&1 | grep -F "Signature=adhoc"
+          cp rust/OUVRIR-MACOS.md "bundle/$BUNDLE_NAME/"
+      - name: Notarize and staple Intel application
+        if: (startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch') && steps.apple-creds.outputs.available == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          app="bundle/$BUNDLE_NAME/PRIORIS.app"
+          submission="$RUNNER_TEMP/PRIORIS-intel-notarization.zip"
+          ditto -c -k --keepParent "$app" "$submission"
+          xcrun notarytool submit "$submission" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait --timeout 30m
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+      - name: Verify signed Intel bundle data initialization
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: |
+          test_data="$RUNNER_TEMP/prioris-intel-runtime-data"
+          PRIORIS_DATA_DIR="$test_data" \
+            "bundle/$BUNDLE_NAME/PRIORIS.app/Contents/MacOS/prioris" --runtime-smoke
+          test -f "$test_data/config.toml"
+          test -d "$test_data/ObsidianVault"
+          test -L "$test_data/models/$MODEL_FILE"
+          test "$(lipo -archs "bundle/$BUNDLE_NAME/PRIORIS.app/Contents/MacOS/prioris")" = "x86_64"
+          codesign --verify --deep --strict --verbose=2 "bundle/$BUNDLE_NAME/PRIORIS.app"
+      - name: Verify bundled LLM on Intel
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: |
+          cd "bundle/$BUNDLE_NAME"
+          PRIORIS.app/Contents/MacOS/prioris --llm-smoke "models/$MODEL_FILE"
+      - name: Package Intel archive
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: ditto -c -k --keepParent "bundle/$BUNDLE_NAME" "$BUNDLE_NAME.zip"
+      - name: Verify packaged Intel archive
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        run: |
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/PRIORIS.app/Contents/MacOS/prioris"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/PRIORIS.app/Contents/Resources/models/$MODEL_FILE"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/ObsidianVault/"
+      - name: Upload Intel release archive
+        if: startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-intel-release-macos-x64
+          path: ${{ env.BUNDLE_NAME }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+      - name: Remove temporary Apple signing keychain
+        if: always() && (startsWith(github.ref, 'refs/tags/rust-intel-v') || github.event_name == 'workflow_dispatch') && steps.apple-creds.outputs.available == 'true'
+        run: |
+          if [ -n "${APPLE_KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$APPLE_KEYCHAIN_PATH" || true
+          fi
+          rm -f "$RUNNER_TEMP/apple-developer-id.p12" "$RUNNER_TEMP/PRIORIS-intel-notarization.zip"
+
+  release:
+    name: Publish separate macOS Intel release
+    if: startsWith(github.ref, 'refs/tags/rust-intel-v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: rust-intel-release-macos-x64
+          path: dist
+      - name: Generate checksum and release notes
+        run: |
+          cd dist
+          sha256sum prioris-rust-intel-v*-macos-x64.zip > SHA256SUMS.txt
+          cd ..
+          version="${GITHUB_REF_NAME#rust-intel-}"
+          echo "RELEASE_NAME=PRIORIS Rust Intel $version" >> "$GITHUB_ENV"
+          cp .github/release-notes/rust-intel-latest.md release-notes.md
+          sed -i "s/__VERSION__/$version/g; s/__TAG__/$GITHUB_REF_NAME/g; s|__REPOSITORY__|$GITHUB_REPOSITORY|g" release-notes.md
+      - name: Create macOS Intel GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true
+          prerelease: true
+          make_latest: false

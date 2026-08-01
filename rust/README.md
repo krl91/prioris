@@ -7,13 +7,16 @@ processus avec `mistral.rs`; il ne démarre aucun serveur et n'ouvre aucun port.
 
 ## Installer une release Rust
 
-Les releases Rust sont séparées des releases Python et utilisent des tags
-`rust-v*`. Ouvre la [liste des releases](https://github.com/krl91/prioris/releases),
-puis télécharge uniquement l'archive correspondant à ton système :
+Les releases Rust sont séparées des releases Python. Les builds Apple Silicon,
+Windows et Linux utilisent des tags `rust-v*`; le build macOS Intel utilise des
+tags `rust-intel-v*`. Ouvre la
+[liste des releases](https://github.com/krl91/prioris/releases), puis télécharge
+uniquement l'archive correspondant à ton système :
 
 | Système | Archive Rust 0.2.5 |
 |---|---|
 | macOS Apple Silicon | `prioris-rust-v0.2.5-macos-arm64.zip` |
+| macOS Intel x64 | `prioris-rust-intel-v0.2.5-macos-x64.zip` |
 | Windows x64 | `prioris-rust-v0.2.5-windows-x64.zip` |
 | Linux x64 | `prioris-rust-v0.2.5-linux-x64.tar.gz` |
 
@@ -29,6 +32,12 @@ bilingue complète est fournie dans `OUVRIR-MACOS.md`. Le lancement en terminal
 reste disponible avec `scripts/run.sh`. Sous Linux, utilise `scripts/run.sh` ;
 sous Windows, `scripts/run.ps1`. `SHA256SUMS.txt`, joint à la release, permet de
 vérifier l'intégrité des archives avant d'autoriser l'application.
+
+Les deux archives macOS nécessitent macOS 13 ou une version plus récente. Le
+workflow Intel compile directement sur le runner GitHub `macos-15-intel` et
+refuse la publication si `uname`, `file` ou `lipo` n'identifie pas un exécutable
+`x86_64`. Il applique ensuite les mêmes tests, la même signature et le même test
+GGUF que le workflow Apple Silicon.
 
 La configuration macOS réellement utilisée est
 `~/Library/Application Support/PRIORIS/config.toml`. Modifie-la depuis l'onglet

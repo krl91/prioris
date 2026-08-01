@@ -129,13 +129,22 @@ enabled = false
 ### 1.2 Install the standalone Rust release
 
 The Rust port is a prerelease distributed separately from Python. Starting
-with Rust 0.2.5, the macOS archive contains a `PRIORIS.app` bundle compatible
-with App Translocation:
+with Rust 0.2.5, both macOS archives contain a `PRIORIS.app` bundle compatible
+with App Translocation. Select the archive matching the Mac processor:
 
-1. open <https://github.com/krl91/prioris/releases> and select `rust-v0.2.5`
-   or a newer Rust release;
-2. download `prioris-rust-v0.2.5-macos-arm64.zip` and extract it;
+| Mac | Release | Archive |
+|---|---|---|
+| Apple Silicon M1 or newer | `rust-v0.2.5` | `prioris-rust-v0.2.5-macos-arm64.zip` |
+| Intel x86_64 | `rust-intel-v0.2.5` | `prioris-rust-intel-v0.2.5-macos-x64.zip` |
+
+1. open <https://github.com/krl91/prioris/releases> and select the release shown
+   in the table, or a newer release from the same family;
+2. download the archive matching the processor and extract it;
 3. double-click `PRIORIS.app`.
+
+In **Apple menu > About This Mac**, **Apple chip** means the `arm64` archive;
+**Intel processor** means the `macos-x64` archive. Both require macOS 13 or
+newer.
 
 Without Apple secrets, the app uses free ad-hoc signing with Hardened Runtime.
 The first launch may say that Apple cannot verify the application. Close that
@@ -176,6 +185,29 @@ When all six Apple secrets are available, the workflow instead signs with a
 staples and validates the ticket, then assesses it with `spctl`. **Open Anyway**
 should not be required in that mode. `scripts/run.sh` launches the same Mach-O.
 Windows and Linux use `scripts/run.ps1` and `scripts/run.sh` respectively.
+
+#### Intel macOS workflow
+
+The separate `.github/workflows/rust-macos-intel.yml` workflow is triggered by
+`rust-intel-v*` tags or manually through `workflow_dispatch`. It runs on
+GitHub's `macos-15-intel` image, builds with Apple Accelerate, then verifies:
+
+1. the runner reports `x86_64` through `uname -m`;
+2. both `file` and `lipo -archs` report an x86_64-only executable;
+3. the self-test and macOS-specific tests pass before packaging;
+4. the bundle contains the configuration, ObsidianVault and GGUF model;
+5. Application Support initialization still works after signing;
+6. Ministral 3B answers through `--llm-smoke`, without a server or port;
+7. the final archive contains every required file before publication.
+
+Signing matches the Apple Silicon workflow: ad-hoc when no Apple secrets are
+configured, or Developer ID plus notarization when all six are present. A
+partial secret set fails the workflow.
+
+GitHub describes `macos-15-intel` as its final `x86_64` environment and states
+that it is available until August 2027. After that, use any remaining Intel
+runner or a self-hosted Intel Mac. See GitHub's
+[official macOS 15 Intel runner announcement](https://github.com/actions/runner-images/issues/13045).
 
 Maintainers may configure these optional GitHub Actions secrets to avoid the
 manual first-launch approval: `APPLE_CERTIFICATE_P12_BASE64`,
@@ -310,7 +342,7 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `229 passed`.
+Expected result: `232 passed`.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -329,7 +361,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `229 passed`.
+Expected result: `232 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -782,7 +814,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 229 passing automated tests.
+- 232 passing automated tests.
 
 Still possible future work:
 

@@ -84,15 +84,18 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             229 automated tests
+tests/             232 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
 vault, SQLite, Telegram nor any network client.
 
 The experimental native port lives in [`rust/`](rust/README.md). Its releases
-use `rust-v*` tags and remain separate from the Python `v0.x` releases. Starting
-with Rust 0.2.5, the macOS archive contains `PRIORIS.app`. Without a paid Apple
+use `rust-v*` tags for Apple Silicon and `rust-intel-v*` for Intel macOS; both
+remain separate from the Python `v0.x` releases. Download
+`prioris-rust-v0.2.5-macos-arm64.zip` on Apple Silicon or
+`prioris-rust-intel-v0.2.5-macos-x64.zip` on an Intel Mac. Starting with Rust
+0.2.5, the macOS archive contains `PRIORIS.app`. Without a paid Apple
 account it is signed ad hoc, so the user approves the first launch in **System
 Settings > Privacy & Security > Open Anyway**. Writable data lives in
 `~/Library/Application Support/PRIORIS`, and the bundle remains compatible with
@@ -164,7 +167,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `229 passed`.
+Expected result in a full source repository clone: `232 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -325,7 +328,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-229 tests pass locally. Remaining possible improvements: advanced scenario
+232 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

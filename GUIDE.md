@@ -132,14 +132,23 @@ enabled = false
 ### 1.2 Installer la release Rust autonome
 
 La version Rust est une préversion séparée de la release Python. Depuis Rust
-0.2.5, l'archive macOS fournit un bundle `PRIORIS.app` compatible avec App
-Translocation :
+0.2.5, les archives macOS fournissent un bundle `PRIORIS.app` compatible avec
+App Translocation. Choisis l'archive correspondant au processeur du Mac :
+
+| Mac | Release | Archive |
+|---|---|---|
+| Apple Silicon M1 ou plus récent | `rust-v0.2.5` | `prioris-rust-v0.2.5-macos-arm64.zip` |
+| Intel x86_64 | `rust-intel-v0.2.5` | `prioris-rust-intel-v0.2.5-macos-x64.zip` |
 
 1. ouvre <https://github.com/krl91/prioris/releases> et sélectionne la release
-   `rust-v0.2.5` ou une version Rust plus récente ;
-2. télécharge `prioris-rust-v0.2.5-macos-arm64.zip` ;
+   indiquée dans le tableau, ou une version plus récente de la même famille ;
+2. télécharge l'archive correspondant au processeur ;
 3. décompresse l'archive ;
 4. double-clique sur `PRIORIS.app`.
+
+Dans **menu Apple > À propos de ce Mac**, la mention **Puce Apple** indique la
+version `arm64`; la mention **Processeur Intel** indique la version `macos-x64`.
+Les deux versions nécessitent macOS 13 ou une version plus récente.
 
 Sans secrets Apple, le bundle utilise une signature ad hoc gratuite avec
 Hardened Runtime. Le premier double-clic peut afficher qu'Apple ne peut pas
@@ -196,6 +205,29 @@ Pour Windows et Linux, télécharge respectivement
 `prioris-rust-v0.2.5-windows-x64.zip` ou
 `prioris-rust-v0.2.5-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
 `scripts/run.sh`.
+
+#### Workflow macOS Intel
+
+Le workflow distinct `.github/workflows/rust-macos-intel.yml` est déclenché par
+les tags `rust-intel-v*` ou manuellement avec `workflow_dispatch`. Il utilise le
+runner GitHub `macos-15-intel`, compile avec Apple Accelerate, puis vérifie :
+
+1. que le runner annonce `x86_64` avec `uname -m` ;
+2. que `file` et `lipo -archs` identifient uniquement `x86_64` ;
+3. que le self-test et les tests macOS spécifiques passent avant le packaging ;
+4. que le bundle contient la configuration, ObsidianVault et le modèle GGUF ;
+5. que l'initialisation Application Support fonctionne après signature ;
+6. que le modèle Ministral 3B répond via `--llm-smoke`, sans serveur ni port ;
+7. que l'archive finale contient bien tous les fichiers avant publication.
+
+Les modes de signature sont identiques à Apple Silicon : signature ad hoc si
+aucun secret Apple n'est configuré, ou Developer ID et notarisation si les six
+secrets sont présents. Un jeu partiel de secrets fait échouer le workflow.
+
+GitHub indique que `macos-15-intel` est son dernier environnement `x86_64` et
+annonce sa disponibilité jusqu'en août 2027. Il faudra alors utiliser le runner
+Intel encore disponible, ou un runner macOS Intel auto-hébergé. Référence :
+[annonce officielle du runner macOS 15 Intel](https://github.com/actions/runner-images/issues/13045).
 
 #### Configurer la signature Apple du workflow (optionnel)
 
@@ -489,7 +521,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `229 passed`.
+Résultat attendu : `232 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -508,7 +540,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `229 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `232 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.7 Rappels pour Obsidian et Windows
@@ -1602,7 +1634,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 229 tests automatisés passent localement dans le dépôt source
+**État tests** : 232 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

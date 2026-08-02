@@ -56,6 +56,9 @@ def test_python_intel_release_has_dedicated_assets_and_notes() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert "prioris-python-intel-v$version-macos-x64" in workflow
     assert "runtime-macos-x64.zip" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "actions/download-artifact@v8" in workflow
+    assert "softprops/action-gh-release@v3" in workflow
     assert "prerelease: true" in workflow
     assert "make_latest: false" in workflow
     assert "prioris-python-intel-__VERSION__-macos-x64.zip" in notes

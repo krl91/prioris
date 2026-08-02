@@ -84,7 +84,7 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             232 automated tests
+tests/             237 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
@@ -107,12 +107,18 @@ uses Developer ID signing and notarization.
 The standard path is to download the latest ready-to-run archive:
 <https://github.com/krl91/prioris/releases/latest>
 
+The Python macOS Intel release is published separately under `python-intel-v*`
+tags. On an Intel Mac, open the
+[release list](https://github.com/krl91/prioris/releases) and select the newest
+release whose title starts with **PRIORIS Python Intel**.
+
 Download **one compressed file**, matching your system. Do not download the
 `runtime-*` assets alone: they do not contain the full application.
 
 | System | File to download | Commands after extraction |
 |---|---|---|
 | macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
+| macOS Intel x64 | `prioris-python-intel-v0.5.3-macos-x64.zip` | `cd prioris-python-intel-v0.5.3-macos-x64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
 | Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64`, then `.\scripts\install_windows.ps1`, then `.\scripts\run_windows.ps1` |
 | Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64`, then `./scripts/install_unix.sh`, then `./scripts/run_unix.sh` |
 
@@ -130,6 +136,18 @@ cd prioris-macos-arm64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
+
+macOS Intel:
+
+```bash
+cd prioris-python-intel-v0.5.3-macos-x64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+The `runtime/macos-x64/llama-simple` engine in this archive is rebuilt on an
+Intel runner. Its architecture, dylibs, signature, and a real inference with
+the bundled GGUF are tested before publication.
 
 On macOS, run `install_unix.sh` before the first launch. `llama-simple` is
 ad-hoc signed, and the scripts remove the macOS quarantine attribute from the
@@ -167,7 +185,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `232 passed`.
+Expected result in a full source repository clone: `237 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -328,7 +346,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-232 tests pass locally. Remaining possible improvements: advanced scenario
+237 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

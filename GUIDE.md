@@ -12,12 +12,16 @@ Le chemin recommandé pour utiliser PRIORIS est le plus simple :
 
 1. Ouvre la dernière release GitHub :
    <https://github.com/krl91/prioris/releases/latest>
+   Pour Python sur Mac Intel, ouvre plutôt la
+   [liste complète](https://github.com/krl91/prioris/releases) et sélectionne
+   la plus récente release **PRIORIS Python Intel** (`python-intel-v*`).
 2. Télécharge **un seul fichier**, celui de ton système. Ne prends pas les
    archives `runtime-*` seules : elles ne contiennent pas toute l'application.
 
 | Système | Fichier compressé à télécharger | Commandes après extraction |
 |---|---|---|
 | macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
+| macOS Intel x64 | `prioris-python-intel-v0.5.3-macos-x64.zip` | `cd prioris-python-intel-v0.5.3-macos-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 | Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64` puis `.\scripts\install_windows.ps1` puis `.\scripts\run_windows.ps1` |
 | Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 
@@ -31,6 +35,14 @@ macOS Apple Silicon :
 
 ```bash
 cd prioris-macos-arm64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+macOS Intel :
+
+```bash
+cd prioris-python-intel-v0.5.3-macos-x64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
@@ -129,6 +141,57 @@ Pour démarrer sans LLM, remplace seulement :
 enabled = false
 ```
 
+#### Release Python macOS Intel
+
+Cette release est distincte de la release Python habituelle et de la release
+Rust. Le workflow `.github/workflows/python-macos-intel.yml` est déclenché par
+un tag `python-intel-v*` ou manuellement avec `workflow_dispatch`. Il utilise
+le runner GitHub `macos-15-intel` et construit les éléments suivants :
+
+1. Python 3.11 x64 et l'application Python complète ;
+2. `llama-simple` depuis les sources épinglées de llama.cpp b10012, avec
+   `CMAKE_OSX_ARCHITECTURES=x86_64`, une cible macOS 13,
+   `GGML_NATIVE=OFF` et Apple Accelerate ;
+3. les dylibs llama.cpp nécessaires dans `runtime/macos-x64/` ;
+4. le wheelhouse Python permettant l'installation sans réseau ;
+5. le modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` et ObsidianVault.
+
+Avant publication, le workflow vérifie dans cet ordre :
+
+1. tous les tests Python et un score pylint d'au moins 9, longueur de ligne
+   ignorée ;
+2. `uname -m` et `platform.machine()`, qui doivent tous deux indiquer
+   `x86_64` ;
+3. l'architecture Mach-O de `llama-simple` avec `file` et `lipo`, ainsi que la
+   présence de `x86_64` dans chaque dylib ;
+4. le `LC_RPATH` `@executable_path`, indispensable pour charger les dylibs
+   après extraction hors du dossier de build GitHub ;
+5. l'absence de `llama-server`, `ggml-rpc-server`, `llama-cli` et d'options de
+   serveur dans l'aide du binaire ;
+6. l'empreinte SHA-256 du modèle 3B téléchargé pendant le build ;
+7. la signature du runtime et de ses dylibs ;
+8. l'installation hors ligne depuis le wheelhouse dans l'archive extraite ;
+9. les 237 tests depuis cette archive, la résolution automatique vers
+   `runtime/macos-x64/llama-simple`, l'import tkinter et la présence du vault ;
+10. une inférence réelle via `scripts/smoke_challenge_llm.py`, en process
+    CLI/stdout sans serveur ni port.
+
+Sans secrets Apple, le moteur est signé ad hoc avec Hardened Runtime et les
+scripts retirent sa quarantaine après extraction. Avec les six secrets Apple
+décrits plus bas, les dylibs et le moteur reçoivent une signature Developer ID
+et l'archive du runtime est soumise à `notarytool`. Un ensemble partiel de
+secrets bloque la publication.
+
+Le workflow publie une préversion séparée avec trois assets :
+
+- `prioris-python-intel-v0.5.3-macos-x64.zip`, application complète ;
+- `runtime-macos-x64.zip`, moteur seul pour intégration avancée ;
+- `SHA256SUMS.txt`, empreintes des deux archives.
+
+Python 3.11 ou plus récent doit être présent sur le Mac avant l'installation.
+Toutes les dépendances de PRIORIS sont ensuite installées depuis le wheelhouse
+embarqué, sans téléchargement. macOS 13 ou plus récent est requis.
+
 ### 1.2 Installer la release Rust autonome
 
 La version Rust est une préversion séparée de la release Python. Depuis Rust
@@ -206,7 +269,7 @@ Pour Windows et Linux, télécharge respectivement
 `prioris-rust-v0.2.5-linux-x64.tar.gz`, puis utilise `scripts/run.ps1` ou
 `scripts/run.sh`.
 
-#### Workflow macOS Intel
+#### Workflow Rust macOS Intel
 
 Le workflow distinct `.github/workflows/rust-macos-intel.yml` est déclenché par
 les tags `rust-intel-v*` ou manuellement avec `workflow_dispatch`. Il utilise le
@@ -224,10 +287,12 @@ Les modes de signature sont identiques à Apple Silicon : signature ad hoc si
 aucun secret Apple n'est configuré, ou Developer ID et notarisation si les six
 secrets sont présents. Un jeu partiel de secrets fait échouer le workflow.
 
-GitHub indique que `macos-15-intel` est son dernier environnement `x86_64` et
-annonce sa disponibilité jusqu'en août 2027. Il faudra alors utiliser le runner
-Intel encore disponible, ou un runner macOS Intel auto-hébergé. Référence :
-[annonce officielle du runner macOS 15 Intel](https://github.com/actions/runner-images/issues/13045).
+GitHub liste actuellement `macos-15-intel` et `macos-26-intel`. PRIORIS épingle
+la version 15 pour conserver une toolchain stable et une cible compatible
+macOS 13 ; GitHub avait annoncé sa disponibilité jusqu'en août 2027. Il faudra
+réévaluer ce choix avant cette date. Références :
+[runners GitHub hébergés](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+et [annonce macOS 15 Intel](https://github.com/actions/runner-images/issues/13045).
 
 #### Configurer la signature Apple du workflow (optionnel)
 
@@ -521,7 +586,7 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `232 passed`.
+Résultat attendu : `237 passed`.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -540,7 +605,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `232 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `237 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.7 Rappels pour Obsidian et Windows
@@ -724,7 +789,8 @@ Fichiers requis dans la release offline :
 - un modèle GGUF local, par défaut
   `models/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` ;
 - un runtime d'inférence pure sans serveur ni port local, par défaut
-  `runtime/macos-arm64/llama-simple` sur macOS Apple Silicon.
+  `runtime/macos-arm64/llama-simple` sur macOS Apple Silicon ou
+  `runtime/macos-x64/llama-simple` sur macOS Intel.
 
 Les archives de release sont volontairement limitées au binaire
 `llama-simple` et à ses dépendances. Elles ne doivent pas contenir
@@ -735,7 +801,7 @@ Les archives de release sont volontairement limitées au binaire
 | Système | Runtime autonome |
 |---|---|
 | macOS Apple Silicon | `runtime/macos-arm64/llama-simple` |
-| macOS Intel | `runtime/macos-x64/llama-simple` à fournir |
+| macOS Intel | `runtime/macos-x64/llama-simple` fourni par la release Python Intel |
 | Windows x64 | `runtime/windows-x64/llama-simple.exe` fourni |
 | Windows arm64 | `runtime/windows-arm64/llama-simple.exe` à fournir |
 | Linux x64 | `runtime/linux-x64/llama-simple` |
@@ -1634,7 +1700,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 232 tests automatisés passent localement dans le dépôt source
+**État tests** : 237 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

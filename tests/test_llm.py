@@ -81,6 +81,17 @@ def test_local_gguf_auto_utilise_llama_simple_macos(monkeypatch):
     assert model == "m.gguf"
 
 
+def test_local_gguf_auto_utilise_llama_simple_macos_intel(monkeypatch):
+    import prioris.llm.client as client_mod
+    monkeypatch.setattr(client_mod.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(client_mod.platform, "machine", lambda: "x86_64")
+    runner, model = client_mod._local_gguf_paths(
+        LLMConfig(provider="local_gguf", runner_path="auto", model="m.gguf")
+    )
+    assert runner == "runtime/macos-x64/llama-simple"
+    assert model == "m.gguf"
+
+
 def test_local_gguf_auto_utilise_llama_simple_windows(monkeypatch):
     import prioris.llm.client as client_mod
     monkeypatch.setattr(client_mod.platform, "system", lambda: "Windows")

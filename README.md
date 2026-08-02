@@ -87,7 +87,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             232 tests automatisés
+tests/             237 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -114,12 +114,18 @@ store, ni bot, ni vault, ni SQLite, ni Telegram, ni client réseau.
 Le chemin standard est de télécharger la dernière archive prête à l'emploi :
 <https://github.com/krl91/prioris/releases/latest>
 
+La release Python macOS Intel est publiée séparément dans la famille de tags
+`python-intel-v*`. Sur un Mac Intel, ouvre la
+[liste des releases](https://github.com/krl91/prioris/releases) et choisis la
+plus récente dont le titre commence par **PRIORIS Python Intel**.
+
 Télécharge **un seul fichier compressé**, celui de ton système. Ne télécharge
 pas les assets `runtime-*` seuls : ils ne contiennent pas toute l'application.
 
 | Système | Fichier à télécharger | Commandes après extraction |
 |---|---|---|
 | macOS Apple Silicon | `prioris-macos-arm64.zip` | `cd prioris-macos-arm64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
+| macOS Intel x64 | `prioris-python-intel-v0.5.3-macos-x64.zip` | `cd prioris-python-intel-v0.5.3-macos-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 | Windows x64 | `prioris-windows-x64.zip` | `cd prioris-windows-x64` puis `.\scripts\install_windows.ps1` puis `.\scripts\run_windows.ps1` |
 | Linux x64 | `prioris-linux-x64.tar.gz` | `cd prioris-linux-x64` puis `./scripts/install_unix.sh` puis `./scripts/run_unix.sh` |
 
@@ -137,6 +143,18 @@ cd prioris-macos-arm64
 ./scripts/install_unix.sh
 ./scripts/run_unix.sh
 ```
+
+macOS Intel :
+
+```bash
+cd prioris-python-intel-v0.5.3-macos-x64
+./scripts/install_unix.sh
+./scripts/run_unix.sh
+```
+
+Le moteur `runtime/macos-x64/llama-simple` de cette archive est recompilé sur
+un runner Intel, puis son architecture, ses dylibs, sa signature et une vraie
+inférence avec le GGUF embarqué sont testées avant publication.
 
 Sur macOS, lance bien `install_unix.sh` avant le premier démarrage. Le runtime
 `llama-simple` est signé ad-hoc, et les scripts retirent la quarantaine macOS
@@ -175,7 +193,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `232 passed`.
+Résultat attendu dans un clone complet du dépôt source : `237 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -340,7 +358,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-232 tests passent localement. Les améliorations restantes envisagées sont :
+237 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.

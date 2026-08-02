@@ -1,0 +1,329 @@
+name: Python macOS Intel CI and release
+
+on:
+  push:
+    tags:
+      - "python-intel-v*"
+  pull_request:
+    paths:
+      - "prioris/**"
+      - "tests/**"
+      - "scripts/**"
+      - "pyproject.toml"
+      - "config.release.toml"
+      - ".github/workflows/python-macos-intel.yml"
+      - ".github/release-notes/python-intel-latest.md"
+      - "ObsidianVault/**"
+      - "README.md"
+      - "README.en.md"
+      - "GUIDE.md"
+      - "GUIDE.en.md"
+  workflow_dispatch:
+
+concurrency:
+  group: python-macos-intel-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  LLAMA_CPP_REF: b10012
+  MODEL_URL: https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/7564922f37fa5bbb62b87f09a55c12f1f91d7a6a/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_FILE: Ministral-3-3B-Instruct-2512-Q4_K_M.gguf
+  MODEL_SHA256: fd46fc371ff0509bfa8657ac956b7de8534d7d9baaa4947975c0648c3aa397f4
+
+jobs:
+  tests:
+    name: Tests before Python Intel build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install quality dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" pylint
+      - name: Run Python tests
+        run: python -m pytest
+      - name: Run pylint
+        run: pylint prioris --disable=line-too-long --fail-under=9
+
+  build:
+    name: Build Python macOS Intel x64
+    needs: tests
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout PRIORIS
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned llama.cpp
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_CPP_REF }}
+          path: llama.cpp
+
+      - name: Set up Intel Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          architecture: x64
+
+      - name: Define and validate version
+        run: |
+          project_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml | head -1)
+          if [[ "$GITHUB_REF" == refs/tags/python-intel-v* ]]; then
+            version="${GITHUB_REF_NAME#python-intel-v}"
+            if [ "$version" != "$project_version" ]; then
+              echo "Tag version $version does not match Python version $project_version" >&2
+              exit 1
+            fi
+          else
+            version="$project_version"
+          fi
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "BUNDLE_NAME=prioris-python-intel-v$version-macos-x64" >> "$GITHUB_ENV"
+
+      - name: Verify Intel runner and interpreter
+        run: |
+          test "$(uname -m)" = "x86_64"
+          python -c 'import platform; assert platform.machine() == "x86_64", platform.machine()'
+          sysctl -n machdep.cpu.brand_string
+
+      - name: Configure Intel llama.cpp runtime
+        run: >
+          cmake -S llama.cpp -B llama-build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=x86_64
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+          -DGGML_NATIVE=OFF
+          -DGGML_ACCELERATE=ON
+          -DLLAMA_OPENSSL=OFF
+          -DLLAMA_BUILD_TESTS=OFF
+
+      - name: Build Intel llama-simple
+        run: cmake --build llama-build --config Release --target llama-simple --parallel 3
+
+      - name: Prepare Intel runtime
+        run: |
+          mkdir -p runtime/macos-x64
+          cp llama.cpp/LICENSE runtime/macos-x64/
+          cp llama-build/bin/llama-simple runtime/macos-x64/
+          find llama-build/bin -maxdepth 1 \( -type f -o -type l \) -name "*.dylib" -exec cp -P {} runtime/macos-x64/ \;
+          if ! otool -l runtime/macos-x64/llama-simple | grep -A2 LC_RPATH | grep -q '@executable_path'; then
+            install_name_tool -add_rpath @executable_path runtime/macos-x64/llama-simple
+          fi
+          cat > "$RUNNER_TEMP/llama-entitlements.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.security.cs.disable-library-validation</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          cat > runtime/macos-x64/allow-macos.sh <<'SCRIPT'
+          #!/bin/sh
+          set -eu
+          xattr -dr com.apple.quarantine "$(dirname "$0")"
+          echo "PRIORIS Intel runtime is allowed to run."
+          SCRIPT
+          chmod +x runtime/macos-x64/llama-simple runtime/macos-x64/allow-macos.sh
+
+      - name: Verify unsigned Intel runtime
+        run: |
+          file runtime/macos-x64/llama-simple | grep -F "Mach-O 64-bit executable x86_64"
+          test "$(lipo -archs runtime/macos-x64/llama-simple)" = "x86_64"
+          vtool -show-build runtime/macos-x64/llama-simple | grep -E 'minos 13(\.0)?$'
+          test -n "$(find runtime/macos-x64 -type f -name '*.dylib' -print -quit)"
+          while IFS= read -r dylib; do
+            lipo -archs "$dylib" | grep -qw x86_64
+          done < <(find runtime/macos-x64 -type f -name "*.dylib")
+          otool -l runtime/macos-x64/llama-simple | grep -A2 LC_RPATH | grep '@executable_path'
+          runtime/macos-x64/llama-simple --help > "$RUNNER_TEMP/llama-help.txt" 2>&1
+          ! grep -Eiq -- '--server-base|instead of starting a new one' "$RUNNER_TEMP/llama-help.txt"
+          ! find runtime/macos-x64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
+
+      - name: Detect Apple release credentials
+        id: apple-creds
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          present=0
+          for name in \
+            APPLE_CERTIFICATE_P12_BASE64 \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_TEAM_ID \
+            APPLE_APP_SPECIFIC_PASSWORD
+          do
+            value="${!name:-}"
+            if [ -n "$value" ]; then
+              present=$((present + 1))
+            fi
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No Apple credentials: llama-simple will be signed ad hoc."
+          elif [ "$present" -eq 6 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Apple credentials found: Developer ID signing and notarization enabled."
+          else
+            echo "Partial Apple credential set ($present/6). Configure all six secrets or remove all of them." >&2
+            exit 1
+          fi
+
+      - name: Import Apple Developer ID certificate
+        if: steps.apple-creds.outputs.available == 'true'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          certificate="$RUNNER_TEMP/apple-developer-id.p12"
+          keychain="$RUNNER_TEMP/prioris-python-intel-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security find-identity -v -p codesigning "$keychain" | grep -F "$APPLE_SIGNING_IDENTITY"
+          echo "APPLE_KEYCHAIN_PATH=$keychain" >> "$GITHUB_ENV"
+
+      - name: Sign Intel runtime with Developer ID
+        if: steps.apple-creds.outputs.available == 'true'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          find runtime/macos-x64 -type f -name "*.dylib" -exec \
+            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" --options runtime --timestamp {} \;
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_KEYCHAIN_PATH" \
+            --options runtime --timestamp --entitlements "$RUNNER_TEMP/llama-entitlements.plist" \
+            runtime/macos-x64/llama-simple
+          find runtime/macos-x64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --verify --strict --verbose=2 {} \;
+          codesign -dv --verbose=4 runtime/macos-x64/llama-simple 2>&1 | grep -F "Authority=Developer ID Application:"
+
+      - name: Sign Intel runtime ad hoc
+        if: steps.apple-creds.outputs.available == 'false'
+        run: |
+          find runtime/macos-x64 -type f -name "*.dylib" -exec codesign --force --sign - --timestamp=none {} \;
+          codesign --force --sign - --options runtime --timestamp=none \
+            --entitlements "$RUNNER_TEMP/llama-entitlements.plist" runtime/macos-x64/llama-simple
+          find runtime/macos-x64 -type f \( -name "llama-simple" -o -name "*.dylib" \) -exec codesign --verify --strict --verbose=2 {} \;
+          codesign -dv --verbose=4 runtime/macos-x64/llama-simple 2>&1 | grep -F "Signature=adhoc"
+
+      - name: Package and optionally notarize Intel runtime
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          ditto -c -k --keepParent runtime/macos-x64 runtime-macos-x64.zip
+          if [ "${{ steps.apple-creds.outputs.available }}" = "true" ]; then
+            xcrun notarytool submit runtime-macos-x64.zip \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --wait --timeout 30m
+          fi
+
+      - name: Build offline Python Intel bundle
+        run: |
+          mkdir -p "bundle/$BUNDLE_NAME/runtime" "bundle/$BUNDLE_NAME/models" "bundle/$BUNDLE_NAME/rust"
+          cp -R prioris tests ObsidianVault scripts "bundle/$BUNDLE_NAME/"
+          cp pyproject.toml README.md README.en.md GUIDE.md GUIDE.en.md config.example.toml "bundle/$BUNDLE_NAME/"
+          cp rust/README.md "bundle/$BUNDLE_NAME/rust/README.md"
+          cp config.release.toml "bundle/$BUNDLE_NAME/config.toml"
+          cp -R runtime/macos-x64 "bundle/$BUNDLE_NAME/runtime/"
+          curl -L --fail --retry 3 --retry-delay 5 "$MODEL_URL" -o "bundle/$BUNDLE_NAME/models/$MODEL_FILE"
+          echo "$MODEL_SHA256  bundle/$BUNDLE_NAME/models/$MODEL_FILE" | shasum -a 256 -c -
+          printf 'Bundled default model:\n%s\n' "$MODEL_FILE" > "bundle/$BUNDLE_NAME/models/README.md"
+          chmod +x "bundle/$BUNDLE_NAME/scripts/install_unix.sh" "bundle/$BUNDLE_NAME/scripts/run_unix.sh"
+          python -m pip download -d "bundle/$BUNDLE_NAME/wheelhouse" \
+            "python-telegram-bot>=21" "setuptools>=40.8.0" wheel "pytest>=8"
+          ditto -c -k --keepParent "bundle/$BUNDLE_NAME" "$BUNDLE_NAME.zip"
+
+      - name: Verify extracted Python Intel release
+        run: |
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/config.toml"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/tests/"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/ObsidianVault/"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/runtime/macos-x64/llama-simple"
+          unzip -l "$BUNDLE_NAME.zip" | grep -F "$BUNDLE_NAME/models/$MODEL_FILE"
+          ! unzip -l "$BUNDLE_NAME.zip" | grep -E "llama-server|ggml-rpc-server|llama-cli"
+          mkdir verify-python-intel
+          ditto -x -k "$BUNDLE_NAME.zip" verify-python-intel
+          cd "verify-python-intel/$BUNDLE_NAME"
+          test "$(lipo -archs runtime/macos-x64/llama-simple)" = "x86_64"
+          xattr -w com.apple.quarantine "0081;00000000;GitHub Actions;PRIORIS" runtime/macos-x64/llama-simple
+          ./scripts/install_unix.sh
+          ! xattr -p com.apple.quarantine runtime/macos-x64/llama-simple
+          .venv/bin/python -m pytest
+          .venv/bin/python -c "import pathlib, platform, tkinter, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; assert platform.machine() == 'x86_64'; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/macos-x64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir(); tkinter.Tcl()"
+          .venv/bin/python scripts/smoke_challenge_llm.py config.toml
+          codesign --verify --strict --verbose=2 runtime/macos-x64/llama-simple
+
+      - name: Upload Python Intel release archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-intel-release-macos-x64
+          path: |
+            runtime-macos-x64.zip
+            ${{ env.BUNDLE_NAME }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
+      - name: Remove temporary Apple signing keychain
+        if: always() && steps.apple-creds.outputs.available == 'true'
+        run: |
+          if [ -n "${APPLE_KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$APPLE_KEYCHAIN_PATH" || true
+          fi
+          rm -f "$RUNNER_TEMP/apple-developer-id.p12"
+
+  release:
+    name: Publish separate Python macOS Intel release
+    if: startsWith(github.ref, 'refs/tags/python-intel-v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: python-intel-release-macos-x64
+          path: dist
+      - name: Generate checksums and release notes
+        run: |
+          cd dist
+          sha256sum *.zip > SHA256SUMS.txt
+          cd ..
+          version="${GITHUB_REF_NAME#python-intel-}"
+          echo "RELEASE_NAME=PRIORIS Python Intel $version" >> "$GITHUB_ENV"
+          cp .github/release-notes/python-intel-latest.md release-notes.md
+          sed -i "s/__VERSION__/$version/g; s/__TAG__/$GITHUB_REF_NAME/g; s|__REPOSITORY__|$GITHUB_REPOSITORY|g" release-notes.md
+      - name: Create Python macOS Intel GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true
+          prerelease: true
+          make_latest: false

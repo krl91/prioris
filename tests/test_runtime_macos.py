@@ -1,12 +1,12 @@
-"""Tests de la signature et du rpath du runtime macOS.
+"""Test the bundled macOS runtime signature and runtime search path.
 
-Ces tests vérifient que llama-simple livré dans la release peut être
-chargé par dyld sur la machine de l'utilisateur. Ils ne s'exécutent que
-sur macOS et skippent silencieusement si le binaire est absent ou non signé.
+These tests ensure that dyld can load the bundled llama-simple runtime on the
+user's machine. They only run on macOS and skip when the binary is missing or
+unsigned.
 
-Deux régressions couvertes :
-  - rpath absolu CI (build/bin/) → @executable_path manquant
-  - Hardened Runtime + Team ID mismatch → disable-library-validation manquant
+Covered regressions:
+  - an absolute CI build rpath instead of @executable_path;
+  - Hardened Runtime Team ID mismatch without disable-library-validation.
 """
 from __future__ import annotations
 
@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
-# Chemin attendu dans le bundle extrait (relatif à tests/)
-_RUNTIME_BIN = Path(__file__).parent.parent / "runtime" / "macos-arm64" / "llama-simple"
+_MACHINE = platform.machine().lower()
+_RUNTIME_PLATFORM = "macos-x64" if _MACHINE in ("x86_64", "amd64") else "macos-arm64"
+_RUNTIME_BIN = Path(__file__).parent.parent / "runtime" / _RUNTIME_PLATFORM / "llama-simple"
 
 
 def _codesign_info(binary: Path) -> str:
@@ -31,21 +32,20 @@ def _codesign_info(binary: Path) -> str:
 @pytest.fixture(scope="module")
 def signed_macos_runtime():
     if platform.system() != "Darwin":
-        pytest.skip("macOS uniquement")
+        pytest.skip("macOS only")
     if not _RUNTIME_BIN.exists():
-        pytest.skip(f"binaire absent : {_RUNTIME_BIN}")
+        pytest.skip(f"missing binary: {_RUNTIME_BIN}")
     info = _codesign_info(_RUNTIME_BIN)
     if "adhoc" not in info and "Signature" not in info:
-        pytest.skip("binaire non signé (build local sans codesign)")
+        pytest.skip("unsigned binary (local build without codesign)")
     return _RUNTIME_BIN
 
 
 def test_rpath_contains_executable_path(signed_macos_runtime):
-    """@executable_path doit figurer dans le LC_RPATH du binaire.
+    """The binary must include @executable_path in LC_RPATH.
 
-    Sans ce rpath, dyld cherche libllama.0.dylib dans le répertoire de build
-    du runner CI (/Users/runner/work/…) introuvable sur la machine de
-    l'utilisateur.
+    Otherwise dyld searches for libllama in the CI build directory, which does
+    not exist on the user's machine.
     """
     result = subprocess.run(
         ["otool", "-l", str(signed_macos_runtime)],
@@ -58,14 +58,11 @@ def test_rpath_contains_executable_path(signed_macos_runtime):
 
 
 def test_entitlement_disable_library_validation(signed_macos_runtime):
-    """L'entitlement disable-library-validation doit être présent.
+    """The runtime must include the disable-library-validation entitlement.
 
-    Avec Hardened Runtime, macOS vérifie que les dylibs chargées ont le même
-    Team ID que le binaire principal. Avec la signature ad-hoc (Team ID = null),
-    chaque binaire a sa propre identité et la validation échoue avec :
-      «not valid for use in process: different Team IDs»
-    L'entitlement com.apple.security.cs.disable-library-validation désactive
-    cette vérification tout en conservant les autres protections.
+    Hardened Runtime requires loaded dylibs to use the main binary's Team ID.
+    Ad-hoc signatures have no shared Team ID, so strict library validation
+    rejects them unless this entitlement is present.
     """
     result = subprocess.run(
         ["codesign", "-dv", "--entitlements", "-", str(signed_macos_runtime)],

@@ -144,7 +144,13 @@ jobs:
             lipo -archs "$dylib" | grep -qw x86_64
           done < <(find runtime/macos-x64 -type f -name "*.dylib")
           otool -l runtime/macos-x64/llama-simple | grep -A2 LC_RPATH | grep '@executable_path'
+          set +e
           runtime/macos-x64/llama-simple --help > "$RUNNER_TEMP/llama-help.txt" 2>&1
+          help_rc=$?
+          set -e
+          test "$help_rc" -eq 0 || test "$help_rc" -eq 1
+          grep -Fq "example usage:" "$RUNNER_TEMP/llama-help.txt"
+          grep -Fq -- "[-n n_predict]" "$RUNNER_TEMP/llama-help.txt"
           ! grep -Eiq -- '--server-base|instead of starting a new one' "$RUNNER_TEMP/llama-help.txt"
           ! find runtime/macos-x64 -type f \( -name "*server*" -o -name "*rpc*" -o -name "llama-cli*" \) | grep .
 

@@ -32,6 +32,8 @@ def test_python_intel_workflow_builds_a_pure_cli_llm_runtime() -> None:
     workflow = _workflow()
     assert "--target llama-simple" in workflow
     assert "@executable_path" in workflow
+    assert 'test "$help_rc" -eq 0 || test "$help_rc" -eq 1' in workflow
+    assert 'grep -Fq -- "[-n n_predict]"' in workflow
     assert "llama-server|ggml-rpc-server|llama-cli" in workflow
     assert "scripts/smoke_challenge_llm.py config.toml" in workflow
     assert "MODEL_SHA256" in workflow

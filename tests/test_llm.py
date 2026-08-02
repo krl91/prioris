@@ -323,6 +323,8 @@ def test_local_gguf_appelle_llama_simple_sans_options_serveur(monkeypatch, tmp_p
 
     calls = []
 
+    monkeypatch.setattr(local_gguf.platform, "system", lambda: "Linux")
+
     def fake_run(args, **kwargs):
         calls.append(args)
         if args[1:] == ["--help"]:
@@ -335,6 +337,43 @@ def test_local_gguf_appelle_llama_simple_sans_options_serveur(monkeypatch, tmp_p
     assert "--server-base" not in calls[-1]
     assert "--single-turn" not in calls[-1]
     assert calls[-1][:5] == [str(runner), "-m", str(model), "-n", "16"]
+
+
+def test_local_gguf_force_cpu_sur_macos_intel(monkeypatch, tmp_path):
+    from prioris.llm import local_gguf
+    from prioris.llm.client_types import LocalGGUFConfig
+    import subprocess
+
+    runner = tmp_path / "llama-simple"
+    model = tmp_path / "m.gguf"
+    runner.write_text("")
+    model.write_text("")
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args[1:] == ["--help"]:
+            return subprocess.CompletedProcess(
+                args, 1,
+                stdout="example usage: x -m model.gguf [-n n_predict]",
+                stderr="",
+            )
+        return subprocess.CompletedProcess(
+            args, 0, stdout='<|assistant|>\n{"ok": true}', stderr=""
+        )
+
+    monkeypatch.setattr(local_gguf.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(local_gguf.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(local_gguf.subprocess, "run", fake_run)
+
+    raw = local_gguf.chat(
+        LocalGGUFConfig(str(runner), str(model), 30, 4), "s", "u"
+    )
+
+    assert json.loads(raw)["ok"] is True
+    assert calls[-1][:7] == [
+        str(runner), "-m", str(model), "-ngl", "0", "-n", "4"
+    ]
 
 
 def test_facade_prioris_interprete_localement():

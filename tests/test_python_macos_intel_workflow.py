@@ -25,6 +25,8 @@ def test_python_intel_workflow_is_isolated_and_native_x64() -> None:
     assert 'test "$(uname -m)" = "x86_64"' in workflow
     assert "-DCMAKE_OSX_ARCHITECTURES=x86_64" in workflow
     assert "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0" in workflow
+    assert "-DGGML_ACCELERATE=ON" in workflow
+    assert "-DGGML_METAL=OFF" in workflow
     assert "lipo -archs runtime/macos-x64/llama-simple" in workflow
 
 
@@ -37,6 +39,7 @@ def test_python_intel_workflow_builds_a_pure_cli_llm_runtime() -> None:
     assert "llama-server|ggml-rpc-server|llama-cli" in workflow
     assert "scripts/smoke_challenge_llm.py config.toml" in workflow
     assert "MODEL_SHA256" in workflow
+    assert "timeout_s = 300" in workflow
 
 
 def test_python_intel_workflow_tests_the_extracted_offline_bundle() -> None:

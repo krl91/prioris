@@ -148,7 +148,7 @@ release. `.github/workflows/python-macos-intel.yml` is triggered by a
 1. Python 3.11 x64 and the complete Python application;
 2. `llama-simple` from pinned llama.cpp b10012 sources, with
    `CMAKE_OSX_ARCHITECTURES=x86_64`, a macOS 13 deployment target,
-   `GGML_NATIVE=OFF`, and Apple Accelerate;
+   `GGML_NATIVE=OFF`, `GGML_METAL=OFF`, and Apple Accelerate;
 3. the required llama.cpp dylibs under `runtime/macos-x64/`;
 4. the Python wheelhouse used for network-free installation;
 5. `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` and ObsidianVault.
@@ -166,10 +166,11 @@ Before publication, the workflow verifies in order:
 6. the downloaded 3B model's SHA-256 digest;
 7. the runtime and dylib signatures;
 8. offline installation from the extracted archive's wheelhouse;
-9. all 237 tests from that archive, automatic selection of
-   `runtime/macos-x64/llama-simple`, tkinter import, and the bundled vault;
-10. real inference through `scripts/smoke_challenge_llm.py`, as a CLI/stdout
-    process without a server or port.
+9. collection of all 238 tests from that archive: 227 pass and 11 source-only
+   contracts are skipped; the Intel macOS checks cover
+   `runtime/macos-x64/llama-simple`, tkinter, and the bundled vault;
+10. real inference through `scripts/smoke_challenge_llm.py`, as a CPU
+    (`-ngl 0`) CLI/stdout process without a server or port.
 
 Without Apple secrets, the engine is ad-hoc signed with Hardened Runtime and
 the scripts remove its quarantine after extraction. With all six Apple secrets
@@ -185,7 +186,8 @@ The workflow publishes a separate prerelease with three assets:
 
 Python 3.11 or newer must already be installed on the Mac. All PRIORIS
 dependencies are then installed from the bundled wheelhouse without downloads.
-macOS 13 or newer is required.
+This archive sets the LLM timeout to 300 seconds to allow the first model load
+on older Intel Macs. macOS 13 or newer is required.
 
 ### 1.2 Install the standalone Rust release
 
@@ -405,7 +407,8 @@ Recent releases include the `tests/` folder. The full verification is:
 python -m pytest
 ```
 
-Expected result: `237 passed`.
+Expected result in an archive: `227 passed, 11 skipped`. The 11 skipped tests
+inspect workflows or internal files that only exist in a source checkout.
 
 Minimal verification if you only want to confirm that the application starts:
 
@@ -424,7 +427,7 @@ In a full source repository clone, also run:
 pytest
 ```
 
-Expected result: `237 passed`.
+Expected result: `238 passed`.
 
 PRIORIS downloads no model at startup. A standalone local GGUF setup must ship
 the inference binary and the model file with the release.
@@ -877,7 +880,7 @@ Implemented:
 - short Obsidian links;
 - daily plan;
 - goals and mirror question;
-- 237 passing automated tests.
+- 238 passing automated tests.
 
 Still possible future work:
 

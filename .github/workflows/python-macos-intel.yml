@@ -101,6 +101,7 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
           -DGGML_NATIVE=OFF
           -DGGML_ACCELERATE=ON
+          -DGGML_METAL=OFF
           -DLLAMA_OPENSSL=OFF
           -DLLAMA_BUILD_TESTS=OFF
 
@@ -253,6 +254,7 @@ jobs:
           cp pyproject.toml README.md README.en.md GUIDE.md GUIDE.en.md config.example.toml "bundle/$BUNDLE_NAME/"
           cp rust/README.md "bundle/$BUNDLE_NAME/rust/README.md"
           cp config.release.toml "bundle/$BUNDLE_NAME/config.toml"
+          sed -i '' 's/^timeout_s = 120$/timeout_s = 300/' "bundle/$BUNDLE_NAME/config.toml"
           cp -R runtime/macos-x64 "bundle/$BUNDLE_NAME/runtime/"
           curl -L --fail --retry 3 --retry-delay 5 "$MODEL_URL" -o "bundle/$BUNDLE_NAME/models/$MODEL_FILE"
           echo "$MODEL_SHA256  bundle/$BUNDLE_NAME/models/$MODEL_FILE" | shasum -a 256 -c -
@@ -278,7 +280,7 @@ jobs:
           ./scripts/install_unix.sh
           ! xattr -p com.apple.quarantine runtime/macos-x64/llama-simple
           .venv/bin/python -m pytest
-          .venv/bin/python -c "import pathlib, platform, tkinter, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; assert platform.machine() == 'x86_64'; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/macos-x64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir(); tkinter.Tcl()"
+          .venv/bin/python -c "import pathlib, platform, tkinter, tomllib; from prioris.llm.client import LLMConfig, _local_gguf_paths; assert platform.machine() == 'x86_64'; cfg=tomllib.loads(pathlib.Path('config.toml').read_text('utf-8')); assert cfg['llm']['timeout_s'] == 300; runner, model = _local_gguf_paths(LLMConfig.from_dict(cfg['llm'])); assert pathlib.Path(runner).as_posix() == 'runtime/macos-x64/llama-simple'; assert pathlib.Path(runner).exists(); assert pathlib.Path(model).exists(); assert pathlib.Path('ObsidianVault').is_dir(); tkinter.Tcl()"
           .venv/bin/python scripts/smoke_challenge_llm.py config.toml
           codesign --verify --strict --verbose=2 runtime/macos-x64/llama-simple
 

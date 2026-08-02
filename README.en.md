@@ -84,7 +84,7 @@ prioris/
 ├── gui/           Local tkinter GUI
 ├── bot/           Telegram adapter
 └── llm/           Optional LLM facade, providers and diagnostics
-tests/             237 automated tests
+tests/             238 automated tests
 ```
 
 `tests/test_architecture.py` enforces that `core/` imports neither store, bot,
@@ -185,7 +185,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result in a full source repository clone: `237 passed`.
+Expected result in a full source repository clone: `238 passed`.
 
 New ready-to-run release archives include `tests/`. To verify a release after
 extraction:
@@ -346,7 +346,7 @@ the next **Sync Obsidian**.
 
 ## Status
 
-237 tests pass locally. Remaining possible improvements: advanced scenario
+238 tests pass locally. Remaining possible improvements: advanced scenario
 comparison, life-balance alerts, monthly bias reports, richer decision memory,
 and controlled creation of Obsidian lines for local tasks without
 `obsidian_path`.

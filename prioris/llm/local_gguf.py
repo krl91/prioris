@@ -98,9 +98,13 @@ def chat(cfg: LocalGGUFConfig, system: str, user: str) -> str:
         args = [
             str(runner),
             "-m", str(model),
-            "-n", str(cfg.max_tokens),
-            prompt,
         ]
+        if platform.system() == "Darwin" and platform.machine().lower() in (
+                "x86_64", "amd64"):
+            # Intel releases are CPU/Accelerate builds. llama-simple otherwise
+            # defaults to 99 GPU layers and stalls on GPU-less Intel runners.
+            args.extend(["-ngl", "0"])
+        args.extend(["-n", str(cfg.max_tokens), prompt])
     else:
         args = [
             str(runner),

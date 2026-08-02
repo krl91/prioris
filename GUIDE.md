@@ -151,7 +151,7 @@ le runner GitHub `macos-15-intel` et construit les éléments suivants :
 1. Python 3.11 x64 et l'application Python complète ;
 2. `llama-simple` depuis les sources épinglées de llama.cpp b10012, avec
    `CMAKE_OSX_ARCHITECTURES=x86_64`, une cible macOS 13,
-   `GGML_NATIVE=OFF` et Apple Accelerate ;
+   `GGML_NATIVE=OFF`, `GGML_METAL=OFF` et Apple Accelerate ;
 3. les dylibs llama.cpp nécessaires dans `runtime/macos-x64/` ;
 4. le wheelhouse Python permettant l'installation sans réseau ;
 5. le modèle `Ministral-3-3B-Instruct-2512-Q4_K_M.gguf` et ObsidianVault.
@@ -171,10 +171,11 @@ Avant publication, le workflow vérifie dans cet ordre :
 6. l'empreinte SHA-256 du modèle 3B téléchargé pendant le build ;
 7. la signature du runtime et de ses dylibs ;
 8. l'installation hors ligne depuis le wheelhouse dans l'archive extraite ;
-9. les 237 tests depuis cette archive, la résolution automatique vers
-   `runtime/macos-x64/llama-simple`, l'import tkinter et la présence du vault ;
+9. la collecte des 238 tests depuis cette archive : 227 passent et les 11
+   contrats réservés au dépôt source sont ignorés ; les contrôles macOS Intel
+   vérifient notamment `runtime/macos-x64/llama-simple`, tkinter et le vault ;
 10. une inférence réelle via `scripts/smoke_challenge_llm.py`, en process
-    CLI/stdout sans serveur ni port.
+    CLI/stdout CPU (`-ngl 0`) sans serveur ni port.
 
 Sans secrets Apple, le moteur est signé ad hoc avec Hardened Runtime et les
 scripts retirent sa quarantaine après extraction. Avec les six secrets Apple
@@ -190,7 +191,9 @@ Le workflow publie une préversion séparée avec trois assets :
 
 Python 3.11 ou plus récent doit être présent sur le Mac avant l'installation.
 Toutes les dépendances de PRIORIS sont ensuite installées depuis le wheelhouse
-embarqué, sans téléchargement. macOS 13 ou plus récent est requis.
+embarqué, sans téléchargement. Le délai LLM de cette archive est réglé à 300
+secondes pour accepter le premier chargement sur les anciens Mac Intel. macOS
+13 ou plus récent est requis.
 
 ### 1.2 Installer la release Rust autonome
 
@@ -586,7 +589,9 @@ complète est donc :
 python -m pytest
 ```
 
-Résultat attendu : `237 passed`.
+Résultat attendu dans une archive : `227 passed, 11 skipped`. Les 11 tests
+ignorés contrôlent des workflows ou fichiers internes uniquement présents dans
+le dépôt source.
 
 Vérification minimale si tu veux seulement confirmer que l'application démarre :
 
@@ -605,7 +610,7 @@ Dans un clone complet du dépôt source, lance aussi :
 pytest
 ```
 
-Résultat attendu : `237 passed`. Si un test échoue, ne pas aller plus loin —
+Résultat attendu : `238 passed`. Si un test échoue, ne pas aller plus loin —
 le moteur de scoring est le produit, il doit être irréprochable.
 
 ### 1.7 Rappels pour Obsidian et Windows
@@ -1700,7 +1705,7 @@ notes `PRIORIS/<id>.md` avec titre clair, format de lien court
 `[[PRIORIS/<id>]]`, migration des anciens liens longs, bouton GUI
 **🔁 Sync Obsidian** avec confirmation dans une fenêtre d'aperçu.
 
-**État tests** : 237 tests automatisés passent localement dans le dépôt source
+**État tests** : 238 tests automatisés passent localement dans le dépôt source
 complet. Les nouvelles archives release embarquent aussi `tests/` pour permettre
 une vérification après extraction.
 

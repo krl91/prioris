@@ -4,8 +4,8 @@
 
 - Ajoute une archive Python complète construite et testée sur un runner macOS
   Intel `x86_64`.
-- Compile `llama-simple` nativement depuis llama.cpp b10012 avec Apple
-  Accelerate, sans Ollama, LM Studio, serveur ni port local.
+- Compile `llama-simple` nativement depuis llama.cpp b10012 en CPU x86_64 avec
+  Apple Accelerate, sans Ollama, LM Studio, serveur ni port local.
 - Inclut Ministral 3B GGUF, les dépendances Python hors ligne, les tests et
   `ObsidianVault`.
 - Vérifie l'installation hors ligne, la GUI Python, la signature du runtime et

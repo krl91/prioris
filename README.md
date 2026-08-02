@@ -87,7 +87,7 @@ prioris/
 ├── gui/           Interface graphique locale tkinter
 ├── bot/           Adaptateur Telegram
 └── llm/           Façade LLM optionnelle, providers et diagnostics
-tests/             237 tests automatisés
+tests/             238 tests automatisés
 ```
 
 Un port natif expérimental est disponible dans [`rust/`](rust/README.md). Il
@@ -193,7 +193,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Résultat attendu dans un clone complet du dépôt source : `237 passed`.
+Résultat attendu dans un clone complet du dépôt source : `238 passed`.
 
 Les nouvelles archives release prêtes à l'emploi incluent aussi `tests/`. Pour
 vérifier une release après extraction :
@@ -358,7 +358,7 @@ au prochain **Sync Obsidian**.
 
 ## État
 
-237 tests passent localement. Les améliorations restantes envisagées sont :
+238 tests passent localement. Les améliorations restantes envisagées sont :
 scénarios comparés avancés, alertes d'équilibre de vie, rapport mensuel de
 biais, mémoire de décision plus riche, et création contrôlée de lignes Obsidian
 pour les tâches locales sans `obsidian_path`.
